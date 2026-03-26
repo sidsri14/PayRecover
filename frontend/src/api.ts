@@ -12,16 +12,16 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     if (!config.headers) {
-      config.headers = {};
+      config.headers = {} as any;
     }
-    config.headers.Authorization = `Bearer ${token}`;
+    (config.headers as any).Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
 // Intercept responses for global error handling (e.g., 401s)
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => response,
   (error) => {
     // If not authorized, clear token and optionally redirect
     if (error.response?.status === 401) {

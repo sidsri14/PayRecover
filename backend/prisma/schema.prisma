@@ -40,7 +40,7 @@ model Monitor {
 model Log {
   id           String   @id @default(uuid())
   monitorId    String
-  monitor      Monitor  @relation(fields: [monitorId], references: [id])
+  monitor      Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
   statusCode   Int?
   responseTime Int?     // in ms
   status       String   // "UP" or "DOWN"
@@ -50,7 +50,7 @@ model Log {
 model Alert {
   id        String   @id @default(uuid())
   monitorId String
-  monitor   Monitor  @relation(fields: [monitorId], references: [id])
+  monitor   Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
   type      String   @default("EMAIL")
   sentAt    DateTime @default(now())
 }

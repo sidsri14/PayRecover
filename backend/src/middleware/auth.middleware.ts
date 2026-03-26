@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
 
 export type AuthRequest = Request & {
@@ -14,6 +14,11 @@ export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction)
   }
 
   const token = authHeader.split(' ')[1];
+  
+  if (!token) {
+    res.status(401).json({ success: false, error: 'Unauthorized: No token provided' });
+    return;
+  }
 
   try {
     const decoded = verifyToken(token);

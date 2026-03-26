@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma';
-import { AuthRequest } from '../middleware/auth.middleware';
+import type { AuthRequest } from '../middleware/auth.middleware';
 
 // Note: In MVP, we might associate monitors directly with users or through projects. 
 // Our schema has Project -> Monitor. We will auto-create a default project if none exists.
@@ -49,8 +49,7 @@ export const getMonitors = async (req: AuthRequest, res: Response, next: NextFun
     const project = await getDefaultProject(req.userId!);
     
     const monitors = await prisma.monitor.findMany({
-      where: { projectId: project.id },
-      orderBy: { createdAt: 'desc' }, // wait, monitor schema has no createdAt. We can just order by id or fetch unordered.
+      where: { projectId: project.id }
     });
 
     res.status(200).json({ success: true, data: monitors });
@@ -61,7 +60,7 @@ export const getMonitors = async (req: AuthRequest, res: Response, next: NextFun
 
 export const getMonitor = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const project = await getDefaultProject(req.userId!);
 
     const monitor = await prisma.monitor.findFirst({
@@ -84,7 +83,7 @@ export const getMonitor = async (req: AuthRequest, res: Response, next: NextFunc
 
 export const deleteMonitor = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const project = await getDefaultProject(req.userId!);
 
     const monitor = await prisma.monitor.findFirst({
@@ -96,9 +95,11 @@ export const deleteMonitor = async (req: AuthRequest, res: Response, next: NextF
       return;
     }
 
-    // Prisma doesn't cascade delete logs implicitly without onDelete: Cascade in schema, so we delete related first manually
+    // First delete all logs and alerts
     await prisma.log.deleteMany({ where: { monitorId: id } });
     await prisma.alert.deleteMany({ where: { monitorId: id } });
+    
+    // Then delete the monitor itself
     await prisma.monitor.delete({ where: { id } });
 
     res.status(200).json({ success: true, data: {} });

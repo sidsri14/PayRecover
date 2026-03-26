@@ -23,26 +23,28 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
     setLoading(true);
 
     try {
-      const { data } = await api.post('/monitors', { url, method, interval });
-      if (data.success) {
+      const response = await api.post('/monitors', { url, method, interval });
+      if (response && response.data && response.data.success) {
         setUrl('');
         setMethod('GET');
         setIntervalVal('60');
         onSuccess();
+      } else {
+        setError('Failed to create monitor. Please try again.');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create monitor');
+      setError(err.response?.data?.error || err.message || 'Failed to create monitor');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
-          <h3 className="font-bold text-lg text-slate-800">Add New Monitor</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-transparent dark:border-slate-800 transition-colors">
+        <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+          <h3 className="font-bold text-lg text-slate-800 dark:text-white">Add New Monitor</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -51,11 +53,11 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
           {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>}
           
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Target URL</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Target URL</label>
             <input 
               type="url" 
               placeholder="https://api.example.com/health"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition"
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               required
@@ -64,9 +66,9 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Method</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Method</label>
               <select 
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition bg-white"
+                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition"
                 value={method}
                 onChange={(e) => setMethod(e.target.value)}
               >
@@ -78,9 +80,9 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Check Interval</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Check Interval</label>
               <select 
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition bg-white"
+                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition"
                 value={interval}
                 onChange={(e) => setIntervalVal(e.target.value)}
               >
@@ -96,7 +98,7 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
             <button 
               type="button" 
               onClick={onClose}
-              className="flex-1 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium py-2 px-4 rounded-lg transition"
+              className="flex-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium py-2 px-4 rounded-lg transition"
             >
               Cancel
             </button>

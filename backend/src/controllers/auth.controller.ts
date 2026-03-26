@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import { prisma } from '../utils/prisma';
 import { generateToken } from '../utils/jwt';
