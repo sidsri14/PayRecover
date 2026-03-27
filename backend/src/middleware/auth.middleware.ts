@@ -1,11 +1,14 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt.js';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export type AuthRequest = Request & {
   userId?: string;
 };
 
-export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -22,6 +25,19 @@ export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction)
 
   try {
     const decoded = verifyToken(token);
+    
+    // CRITICAL: Verify user still exists in the database 
+    // This handles cases where the DB was migrated/reset but the user has an old JWT
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true }
+    });
+
+    if (!user) {
+      res.status(401).json({ success: false, error: 'Unauthorized: User no longer exists' });
+      return;
+    }
+
     req.userId = decoded.userId;
     next();
   } catch (error) {

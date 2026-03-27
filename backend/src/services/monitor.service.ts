@@ -1,4 +1,5 @@
 import { prisma } from '../utils/prisma.js';
+import { validateUrlForSSRF } from '../utils/security.js';
 
 export class MonitorService {
   private static async getDefaultProject(userId: string) {
@@ -16,6 +17,14 @@ export class MonitorService {
 
   static async createMonitor(userId: string, data: any) {
     const { url, method, interval } = data;
+
+    // Phase 5: SSD/SSRF Protection - Block local/private URLs at API level
+    const isSafe = await validateUrlForSSRF(url);
+    if (!isSafe) {
+      const error = new Error('SSRF Security Violation: Local/Private URLs are not allowed.');
+      (error as any).status = 403;
+      throw error;
+    }
 
     const project = await this.getDefaultProject(userId);
 

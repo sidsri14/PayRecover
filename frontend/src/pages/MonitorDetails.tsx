@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Clock, Activity, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Clock, Activity, CheckCircle, XCircle, RefreshCw, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
+import toast from 'react-hot-toast';
 
 interface Log {
   id: string;
@@ -28,15 +29,22 @@ const MonitorDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [monitor, setMonitor] = useState<Monitor | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchMonitor = useCallback(async () => {
     try {
       const { data } = await api.get(`/monitors/${id}`);
       if (data.success) {
         setMonitor(data.data);
+        setError(null);
       }
-    } catch (err) {
-      console.error('Failed to fetch monitor details', err);
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to fetch monitor details';
+      setError(msg);
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        toast.error('Session expired');
+      }
     } finally {
       setLoading(false);
     }
@@ -48,7 +56,26 @@ const MonitorDetails: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchMonitor]);
 
-  if (loading && !monitor) return <div className="p-8 text-center">Loading details...</div>;
+  if (loading && !monitor) {
+    return (
+      <div className="flex flex-col justify-center items-center h-64 text-slate-500">
+        <RefreshCw className="w-8 h-8 animate-spin mb-3 text-primary-500" />
+        <p className="font-medium">Loading monitor details...</p>
+      </div>
+    );
+  }
+
+  if (error && !monitor) {
+    return (
+      <div className="flex flex-col justify-center items-center h-64 text-center">
+        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Failed to load details</h2>
+        <p className="text-slate-500 dark:text-slate-400 mt-2">{error}</p>
+        <Link to="/" className="mt-6 text-primary-500 hover:underline">Back to Dashboard</Link>
+      </div>
+    );
+  }
+
   if (!monitor) return <div className="p-8 text-center text-red-500">Monitor not found</div>;
 
   const chartData = [...(monitor.logs || [])].reverse().map((log) => ({

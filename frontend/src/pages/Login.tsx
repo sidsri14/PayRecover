@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import toast from 'react-hot-toast';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -17,12 +18,16 @@ const Login: React.FC = () => {
       const { data } = await api.post('/auth/login', { email, password });
       if (data.success && data.data.token) {
         localStorage.setItem('token', data.data.token);
+        toast.success('Welcome back!');
         // We do a hard reload to reset the app state with new auth context
-        window.location.href = '/';
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 500);
       }
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to login');
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || 'Failed to login';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

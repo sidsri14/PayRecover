@@ -3,6 +3,7 @@ import { sendAlertEmail } from './services/email.service.js';
 import pLimit from 'p-limit';
 import pino from 'pino';
 import type { Monitor } from '@prisma/client';
+import { validateUrlForSSRF } from './utils/security.js';
 
 const logger = pino({
   transport: {
@@ -77,6 +78,12 @@ const executeCheck = async (monitor: Monitor) => {
   logger.debug(`[Queue Executing] Checking ${monitor.url} [${monitor.method}]`);
 
   try {
+    // Phase 5: SSRF Check
+    const isSafe = await validateUrlForSSRF(monitor.url);
+    if (!isSafe) {
+      throw new Error("SSRF Security Violation: Target URL resolves to a forbidden private/local IP range.");
+    }
+
     const response = await fetchWithRetry(monitor.url, monitor.method);
     statusCode = response.status;
     if (response.ok) {

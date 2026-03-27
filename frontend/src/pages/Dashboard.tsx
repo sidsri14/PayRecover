@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, Activity, ServerCrash, Clock, Trash2 } from 'lucide-react';
+import { PlusCircle, Activity, ServerCrash, Clock, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
 import { api } from '../api';
 import CreateMonitorModal from '../components/CreateMonitorModal';
+import toast from 'react-hot-toast';
 
 interface Monitor {
   id: string;
@@ -17,17 +18,26 @@ interface Monitor {
 const Dashboard: React.FC = () => {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
 
-  const fetchMonitors = async () => {
+  const fetchMonitors = async (isManual = false) => {
     try {
+      if (isManual) setLoading(true);
       const { data } = await api.get('/monitors');
       if (data.success) {
         setMonitors(data.data);
+        setError(null);
       }
-    } catch (err) {
-      console.error('Failed to fetch monitors', err);
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to fetch monitors';
+      setError(msg);
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+        toast.error('Session expired. Please login again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -41,16 +51,48 @@ const Dashboard: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this monitor?')) return;
+    
+    // Optimistic Update
+    const previousMonitors = [...monitors];
+    setMonitors(monitors.filter(m => m.id !== id));
+    
     try {
       await api.delete(`/monitors/${id}`);
-      fetchMonitors();
-    } catch (err) {
-      console.error('Failed to delete monitor', err);
+      toast.success('Monitor deleted successfully');
+    } catch (err: any) {
+      setMonitors(previousMonitors);
+      const msg = err.response?.data?.error || 'Failed to delete monitor';
+      toast.error(msg);
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+      }
     }
   };
 
   if (loading && monitors.length === 0) {
-    return <div className="flex justify-center items-center h-64">Loading monitors...</div>;
+    return (
+      <div className="flex flex-col justify-center items-center h-64 text-slate-500">
+        <RefreshCw className="w-8 h-8 animate-spin mb-3 text-primary-500" />
+        <p className="font-medium">Loading your monitors...</p>
+      </div>
+    );
+  }
+
+  if (error && monitors.length === 0) {
+    return (
+      <div className="flex flex-col justify-center items-center h-64 text-center">
+        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Connection Error</h2>
+        <p className="text-slate-500 dark:text-slate-400 mt-2">{error}</p>
+        <button 
+          onClick={() => fetchMonitors(true)}
+          className="mt-6 bg-primary-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-primary-500 transition"
+        >
+          Try Again
+        </button>
+      </div>
+    );
   }
 
   const upCount = monitors.filter(m => m.status === 'UP').length;

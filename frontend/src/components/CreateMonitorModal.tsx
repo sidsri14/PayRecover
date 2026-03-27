@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../api';
+import toast from 'react-hot-toast';
 
 interface Props {
   isOpen: boolean;
@@ -25,16 +26,20 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
     try {
       const response = await api.post('/monitors', { url, method, interval });
       if (response && response.data && response.data.success) {
+        toast.success('Monitor created successfully');
         setUrl('');
         setMethod('GET');
         setIntervalVal('60');
         onSuccess();
       } else {
+        toast.error('Failed to create monitor');
         setError('Failed to create monitor. Please try again.');
       }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message?: string };
-      setError(error.response?.data?.error || error.message || 'Failed to create monitor');
+      const msg = error.response?.data?.error || error.message || 'Failed to create monitor';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

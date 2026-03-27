@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import MonitorDetails from './pages/MonitorDetails';
 import { Moon, Sun } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
 
 const ThemeToggle = () => {
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
@@ -52,6 +53,7 @@ function App() {
 
   return (
     <Router>
+      <Toaster position="top-right" />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

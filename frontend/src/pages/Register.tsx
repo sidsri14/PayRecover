@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import toast from 'react-hot-toast';
 
 const Register: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -17,11 +18,15 @@ const Register: React.FC = () => {
       const { data } = await api.post('/auth/register', { email, password });
       if (data.success && data.data.token) {
         localStorage.setItem('token', data.data.token);
-        window.location.href = '/';
+        toast.success('Account created successfully!');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 500);
       }
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to register');
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || 'Failed to register';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -57,8 +62,11 @@ const Register: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={8}
             />
+            <p className="text-[10px] mt-1 text-slate-500 dark:text-slate-400">
+              Min 8 chars, 1 uppercase, 1 number, 1 special character.
+            </p>
           </div>
           <button 
             type="submit" 

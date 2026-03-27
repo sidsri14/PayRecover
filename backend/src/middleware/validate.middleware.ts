@@ -8,10 +8,9 @@ export const validateRequest = (schema: ZodSchema) => {
     try {
       await schema.parseAsync(req.body);
       next();
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const zodError = error as z.ZodError<any>;
-        const message = zodError.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+    } catch (error: any) {
+      if (error && error.issues) {
+        const message = error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
         errorResponse(res, message, 400);
       } else {
         errorResponse(res, 'Internal validation error', 500);
