@@ -16,8 +16,7 @@ const Register: React.FC = () => {
     
     try {
       const { data } = await api.post('/auth/register', { email, password });
-      if (data.success && data.data.token) {
-        localStorage.setItem('token', data.data.token);
+      if (data.success) {
         toast.success('Account created successfully!');
         setTimeout(() => {
           window.location.href = '/';

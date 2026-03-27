@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Clock, Activity, CheckCircle, XCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Clock, Activity, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 import toast from 'react-hot-toast';
@@ -42,7 +42,6 @@ const MonitorDetails: React.FC = () => {
       const msg = err.response?.data?.error || 'Failed to fetch monitor details';
       setError(msg);
       if (err.response?.status === 401) {
-        localStorage.removeItem('token');
         toast.error('Session expired');
       }
     } finally {
@@ -58,20 +57,35 @@ const MonitorDetails: React.FC = () => {
 
   if (loading && !monitor) {
     return (
-      <div className="flex flex-col justify-center items-center h-64 text-slate-500">
-        <RefreshCw className="w-8 h-8 animate-spin mb-3 text-primary-500" />
-        <p className="font-medium">Loading monitor details...</p>
+      <div>
+        <div className="h-5 w-32 bg-slate-200 dark:bg-slate-700 rounded mb-6 animate-pulse" />
+        <div className="h-8 w-96 bg-slate-200 dark:bg-slate-700 rounded mb-3 animate-pulse" />
+        <div className="h-4 w-48 bg-slate-200 dark:bg-slate-700 rounded mb-8 animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 animate-pulse">
+              <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-28 mb-4" />
+              <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-16" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 mb-8 animate-pulse">
+          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-40 mb-6" />
+          <div className="h-72 bg-slate-100 dark:bg-slate-800 rounded-lg" />
+        </div>
       </div>
     );
   }
 
   if (error && !monitor) {
     return (
-      <div className="flex flex-col justify-center items-center h-64 text-center">
+      <div className="flex flex-col justify-center items-center h-72 text-center">
         <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
         <h2 className="text-xl font-bold text-slate-800 dark:text-white">Failed to load details</h2>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">{error}</p>
-        <Link to="/" className="mt-6 text-primary-500 hover:underline">Back to Dashboard</Link>
+        <p className="text-slate-500 dark:text-slate-400 mt-2 max-w-sm">{error}</p>
+        <Link to="/" className="mt-6 bg-primary-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-primary-500 transition">
+          Back to Dashboard
+        </Link>
       </div>
     );
   }

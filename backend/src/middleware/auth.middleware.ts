@@ -9,15 +9,17 @@ export type AuthRequest = Request & {
 };
 
 export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-  const authHeader = req.headers.authorization;
+  // Priority 1: Cookie
+  let token = req.cookies?.token;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ success: false, error: 'Unauthorized: No token provided' });
-    return;
+  // Priority 2: Authorization Header
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
   }
 
-  const token = authHeader.split(' ')[1];
-  
   if (!token) {
     res.status(401).json({ success: false, error: 'Unauthorized: No token provided' });
     return;

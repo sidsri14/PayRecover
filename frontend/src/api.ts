@@ -5,14 +5,30 @@ const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' :
 
 export const api = axios.create({
   baseURL: API_URL,
+  withCredentials: true, // Phase 2: Secure Cookie Support
 });
 
-// Intercept requests to add JWT token
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
+// Phase 2: CSRF Token — cached per page load
+let csrfToken: string | null = null;
+const getCsrfToken = async (): Promise<string> => {
+  if (!csrfToken) {
+    const { data } = await axios.get(`${API_URL.replace('/api', '')}/api/csrf-token`, { withCredentials: true });
+    csrfToken = data.token;
+  }
+  return csrfToken!;
+};
+
+// Attach the CSRF token to every state-changing request
+api.interceptors.request.use(async (config) => {
+  const method = (config.method ?? '').toLowerCase();
+  if (['post', 'put', 'patch', 'delete'].includes(method)) {
+    try {
+      const token = await getCsrfToken();
+      config.headers = config.headers || {};
+      config.headers['x-csrf-token'] = token;
+    } catch {
+      // Fail silently; the server will reject if CSRF is invalid
+    }
   }
   return config;
 });
@@ -21,10 +37,12 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // If not authorized, clear token and optionally redirect
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      // window.location.href = '/login'; // Let the React wrapper handle navigation instead to avoid hard reloads if possible
+      // In cookie-based auth, we don't need to manually clear tokens.
+    }
+    // On CSRF failure, clear the cached token so next request fetches fresh
+    if (error.response?.status === 403) {
+      csrfToken = null;
     }
     return Promise.reject(error);
   }

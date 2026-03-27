@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, Activity, ServerCrash, Clock, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  PlusCircle, Activity, ServerCrash, Clock, Trash2, AlertCircle,
+  Search, ArrowUpDown, TrendingUp, TrendingDown, Minus, Shield, RefreshCw
+} from 'lucide-react';
 import { api } from '../api';
 import CreateMonitorModal from '../components/CreateMonitorModal';
 import toast from 'react-hot-toast';
@@ -13,13 +16,78 @@ interface Monitor {
   interval: number;
   status: string;
   lastCheckedAt?: string;
+  avgResponseTime?: number;
+  responseTimeTrend?: 'up' | 'down' | 'stable';
 }
+
+type SortKey = 'status' | 'url' | 'lastCheckedAt' | 'avgResponseTime';
+type SortDir = 'asc' | 'desc';
+
+// ── Skeleton card
+const SkeletonCard: React.FC = () => (
+  <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 animate-pulse">
+    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24 mb-4" />
+    <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-12" />
+  </div>
+);
+
+// ── Skeleton monitor row
+const SkeletonRow: React.FC = () => (
+  <li className="p-4 sm:px-6 flex items-center justify-between animate-pulse">
+    <div className="flex-1 space-y-2">
+      <div className="flex items-center space-x-3">
+        <div className="w-3 h-3 rounded-full bg-slate-200 dark:bg-slate-700" />
+        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-56" />
+        <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-10" />
+      </div>
+      <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded w-36 ml-6" />
+    </div>
+    <div className="h-5 w-5 rounded bg-slate-200 dark:bg-slate-700" />
+  </li>
+);
+
+// ── Trend badge
+const TrendBadge: React.FC<{ trend?: 'up' | 'down' | 'stable'; value?: number }> = ({ trend, value }) => {
+  if (!trend || !value) return null;
+  if (trend === 'up') return (
+    <span className="flex items-center text-xs font-medium text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-full">
+      <TrendingUp className="w-3 h-3 mr-1" />{value}ms
+    </span>
+  );
+  if (trend === 'down') return (
+    <span className="flex items-center text-xs font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full">
+      <TrendingDown className="w-3 h-3 mr-1" />{value}ms
+    </span>
+  );
+  return (
+    <span className="flex items-center text-xs font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+      <Minus className="w-3 h-3 mr-1" />{value}ms
+    </span>
+  );
+};
+
+// ── Status dot with pulse for DOWN
+const StatusDot: React.FC<{ status: string }> = ({ status }) => {
+  const base = 'w-3 h-3 rounded-full flex-shrink-0';
+  if (status === 'UP') return <span className={`${base} bg-emerald-500`} />;
+  if (status === 'DOWN') return (
+    <span className="relative flex h-3 w-3 flex-shrink-0">
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+      <span className={`${base} bg-red-500 relative`} />
+    </span>
+  );
+  return <span className={`${base} bg-amber-400`} />;
+};
 
 const Dashboard: React.FC = () => {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('status');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
   const fetchMonitors = async (isManual = false) => {
@@ -33,11 +101,7 @@ const Dashboard: React.FC = () => {
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to fetch monitors';
       setError(msg);
-      if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-        toast.error('Session expired. Please login again.');
-      }
+      if (err.response?.status === 401) navigate('/login');
     } finally {
       setLoading(false);
     }
@@ -45,129 +109,258 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchMonitors();
-    const interval = setInterval(fetchMonitors, 10000); // Poll every 10s
+    const interval = setInterval(fetchMonitors, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this monitor?')) return;
-    
-    // Optimistic Update
-    const previousMonitors = [...monitors];
-    setMonitors(monitors.filter(m => m.id !== id));
-    
+    if (!window.confirm('Delete this monitor?')) return;
+
+    // Optimistic remove + track deleting state
+    setDeletingIds(prev => new Set([...prev, id]));
+    const prev = [...monitors];
+    setMonitors(m => m.filter(x => x.id !== id));
+
     try {
       await api.delete(`/monitors/${id}`);
-      toast.success('Monitor deleted successfully');
+      toast.success('Monitor deleted');
     } catch (err: any) {
-      setMonitors(previousMonitors);
+      setMonitors(prev);
       const msg = err.response?.data?.error || 'Failed to delete monitor';
       toast.error(msg);
-      if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-      }
+      if (err.response?.status === 401) navigate('/login');
+    } finally {
+      setDeletingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
     }
   };
 
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return [...monitors]
+      .filter(m => m.url.toLowerCase().includes(q) || m.method.toLowerCase().includes(q))
+      .sort((a, b) => {
+        let cmp = 0;
+        if (sortKey === 'status') {
+          const order: Record<string, number> = { DOWN: 0, PENDING: 1, UP: 2 };
+          cmp = (order[a.status] ?? 3) - (order[b.status] ?? 3);
+        } else if (sortKey === 'url') {
+          cmp = a.url.localeCompare(b.url);
+        } else if (sortKey === 'lastCheckedAt') {
+          cmp = (new Date(a.lastCheckedAt || 0).getTime()) - (new Date(b.lastCheckedAt || 0).getTime());
+        } else if (sortKey === 'avgResponseTime') {
+          cmp = (a.avgResponseTime ?? Infinity) - (b.avgResponseTime ?? Infinity);
+        }
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+  }, [monitors, search, sortKey, sortDir]);
+
+  const upCount = monitors.filter(m => m.status === 'UP').length;
+  const downCount = monitors.filter(m => m.status === 'DOWN').length;
+  const uptimePct = monitors.length > 0 ? Math.round((upCount / monitors.length) * 100) : 0;
+
+  // ── Initial skeleton load
   if (loading && monitors.length === 0) {
     return (
-      <div className="flex flex-col justify-center items-center h-64 text-slate-500">
-        <RefreshCw className="w-8 h-8 animate-spin mb-3 text-primary-500" />
-        <p className="font-medium">Loading your monitors...</p>
+      <div>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Overview of your API health</p>
+          </div>
+          <div className="w-36 h-10 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+          </ul>
+        </div>
       </div>
     );
   }
 
+  // ── Error state (no data at all)
   if (error && monitors.length === 0) {
     return (
       <div className="flex flex-col justify-center items-center h-64 text-center">
         <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
         <h2 className="text-xl font-bold text-slate-800 dark:text-white">Connection Error</h2>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">{error}</p>
-        <button 
+        <p className="text-slate-500 dark:text-slate-400 mt-2 max-w-sm">{error}</p>
+        <button
           onClick={() => fetchMonitors(true)}
-          className="mt-6 bg-primary-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-primary-500 transition"
+          className="mt-6 bg-primary-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-primary-500 transition flex items-center gap-2"
         >
-          Try Again
+          <RefreshCw className="w-4 h-4" /> Try Again
         </button>
       </div>
     );
   }
 
-  const upCount = monitors.filter(m => m.status === 'UP').length;
-  const downCount = monitors.filter(m => m.status === 'DOWN').length;
-
   return (
     <div>
+      {/* ── Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Overview of your API health</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium flex items-center transition"
-        >
-          <PlusCircle className="w-5 h-5 mr-2" />
-          Add Monitor
-        </button>
+        <div className="flex items-center gap-3">
+          {loading && (
+            <RefreshCw className="w-4 h-4 text-slate-400 animate-spin" aria-label="Refreshing…" />
+          )}
+          {error && (
+            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-full">
+              Live update failed
+            </span>
+          )}
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium flex items-center transition shadow-sm"
+          >
+            <PlusCircle className="w-5 h-5 mr-2" /> Add Monitor
+          </button>
+        </div>
       </div>
 
+      {/* ── Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">Total</span>
+          <div className="text-3xl font-bold text-slate-800 dark:text-white mt-2">{monitors.length}</div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-emerald-100 dark:border-emerald-900/40 transition-colors">
+          <span className="text-emerald-600 dark:text-emerald-500 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
+            <Activity className="w-3.5 h-3.5" /> Healthy
+          </span>
+          <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-500 mt-2">{upCount}</div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-red-100 dark:border-red-900/40 transition-colors">
+          <span className="text-red-500 dark:text-red-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
+            <ServerCrash className="w-3.5 h-3.5" /> Failing
+          </span>
+          <div className="text-3xl font-bold text-red-500 dark:text-red-400 mt-2">{downCount}</div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-primary-100 dark:border-primary-900/40 transition-colors">
+          <span className="text-primary-600 dark:text-primary-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
+            <Shield className="w-3.5 h-3.5" /> Uptime
+          </span>
+          <div className={`text-3xl font-bold mt-2 ${uptimePct === 100 ? 'text-emerald-600 dark:text-emerald-500' : uptimePct >= 80 ? 'text-amber-500' : 'text-red-500'}`}>
+            {monitors.length === 0 ? '—' : `${uptimePct}%`}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Search + Sort toolbar */}
       {monitors.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col transition-colors">
-            <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">Total Monitors</span>
-            <span className="text-3xl font-bold text-slate-800 dark:text-white mt-2">{monitors.length}</span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by URL or method…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
+            />
           </div>
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-emerald-100 dark:border-emerald-900/50 flex flex-col transition-colors">
-            <span className="text-emerald-600 dark:text-emerald-500 text-sm font-medium flex items-center"><Activity className="w-4 h-4 mr-1" /> Healthy</span>
-            <span className="text-3xl font-bold text-emerald-600 dark:text-emerald-500 mt-2">{upCount}</span>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-red-100 dark:border-red-900/50 flex flex-col transition-colors">
-            <span className="text-red-500 dark:text-red-400 text-sm font-medium flex items-center"><ServerCrash className="w-4 h-4 mr-1" /> Failing</span>
-            <span className="text-3xl font-bold text-red-500 dark:text-red-400 mt-2">{downCount}</span>
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <ArrowUpDown className="w-3.5 h-3.5" />
+            <span>Sort:</span>
+            {(['status', 'url', 'lastCheckedAt', 'avgResponseTime'] as SortKey[]).map(key => {
+              const labels: Record<SortKey, string> = { status: 'Status', url: 'URL', lastCheckedAt: 'Last Check', avgResponseTime: 'Latency' };
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggleSort(key)}
+                  className={`px-3 py-1.5 rounded-full transition ${sortKey === key
+                    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {labels[key]} {sortKey === key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
+      {/* ── Monitor list */}
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
         {monitors.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">
-            <Activity className="w-12 h-12 mx-auto text-slate-300 mb-4" />
-            <p className="text-lg">No monitors configured yet.</p>
-            <p className="text-sm mt-1">Add your first endpoint to start tracking uptime.</p>
+          // Empty state
+          <div className="p-16 text-center">
+            <div className="w-16 h-16 bg-primary-50 dark:bg-primary-900/20 rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <Activity className="w-8 h-8 text-primary-500" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">No monitors yet</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xs mx-auto mb-6">
+              Add your first API endpoint to start tracking uptime and response times.
+            </p>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-lg font-medium inline-flex items-center gap-2 transition shadow-sm"
+            >
+              <PlusCircle className="w-4 h-4" /> Add your first monitor
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
+          // No search results
+          <div className="p-12 text-center">
+            <Search className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+            <p className="text-slate-500 dark:text-slate-400 font-medium">No monitors match <span className="font-bold text-slate-700 dark:text-slate-200">"{search}"</span></p>
+            <button onClick={() => setSearch('')} className="mt-3 text-primary-500 text-sm hover:underline">Clear search</button>
           </div>
         ) : (
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {monitors.map((monitor) => (
-              <li key={monitor.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                <div 
-                  onClick={() => navigate(`/monitors/${monitor.id}`)} 
+            {filtered.map((monitor) => (
+              <li
+                key={monitor.id}
+                className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition group ${deletingIds.has(monitor.id) ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                <div
+                  onClick={() => navigate(`/monitors/${monitor.id}`)}
                   className="p-4 sm:px-6 flex items-center justify-between cursor-pointer"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-3 mb-1">
-                      <span className={`w-3 h-3 rounded-full ${
-                        monitor.status === 'UP' ? 'bg-emerald-500' : 
-                        monitor.status === 'DOWN' ? 'bg-red-500' : 'bg-amber-400'
-                      }`} title={monitor.status}></span>
+                    <div className="flex items-center space-x-3 mb-1.5">
+                      <StatusDot status={monitor.status} />
                       <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{monitor.url}</p>
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">{monitor.method}</span>
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex-shrink-0">
+                        {monitor.method}
+                      </span>
+                      {monitor.status === 'DOWN' && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex-shrink-0">
+                          DOWN
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center text-xs text-slate-500 dark:text-slate-400 space-x-4">
-                      <span className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {monitor.interval}s</span>
-                      <span>Last check: {monitor.lastCheckedAt ? new Date(monitor.lastCheckedAt).toLocaleTimeString() : 'Pending...'}</span>
+
+                    <div className="flex items-center flex-wrap text-xs text-slate-500 dark:text-slate-400 space-x-4 ml-6">
+                      <span className="flex items-center">
+                        <Clock className="w-3 h-3 mr-1" /> {monitor.interval}s
+                      </span>
+                      <span>
+                        Last: {monitor.lastCheckedAt
+                          ? new Date(monitor.lastCheckedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                          : <span className="text-amber-500 font-medium">Pending first check…</span>}
+                      </span>
+                      {monitor.avgResponseTime !== undefined && (
+                        <TrendBadge trend={monitor.responseTimeTrend} value={monitor.avgResponseTime} />
+                      )}
                     </div>
                   </div>
-                  
-                  <button 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDelete(monitor.id);
-                    }}
-                    className="text-slate-400 hover:text-red-500 transition cursor-pointer p-2 z-10"
+
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(monitor.id); }}
+                    className="text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition opacity-0 group-hover:opacity-100 cursor-pointer p-2 z-10 ml-2"
                     title="Delete Monitor"
                   >
                     <Trash2 className="w-5 h-5 pointer-events-none" />
@@ -179,13 +372,17 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      <CreateMonitorModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSuccess={() => {
-          setIsModalOpen(false);
-          fetchMonitors();
-        }}
+      {/* ── Count bar */}
+      {filtered.length > 0 && filtered.length !== monitors.length && (
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-3 text-right">
+          Showing {filtered.length} of {monitors.length} monitors
+        </p>
+      )}
+
+      <CreateMonitorModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={() => { setIsModalOpen(false); fetchMonitors(); }}
       />
     </div>
   );

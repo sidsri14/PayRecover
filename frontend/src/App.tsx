@@ -6,7 +6,8 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import MonitorDetails from './pages/MonitorDetails';
 import { Moon, Sun } from 'lucide-react';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
+import { api } from './api';
 
 const ThemeToggle = () => {
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
@@ -31,34 +32,80 @@ const ThemeToggle = () => {
   );
 };
 
-const Layout = ({ children }: { children: React.ReactNode }) => (
-  <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors">
-    <header className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center transition-colors">
-      <span className="font-bold text-xl text-primary-600 dark:text-primary-500">API Pulse</span>
-      <ThemeToggle />
-    </header>
-    <main className="flex-1 p-4 max-w-7xl mx-auto w-full">
-      {children}
-    </main>
-  </div>
-);
-
-// Simple PrivateRoute wrapper
-const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = !!localStorage.getItem('token');
-  return isAuthenticated ? children : <Navigate to="/login" />;
-};
-
 function App() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const checkAuth = async () => {
+    try {
+      const { data } = await api.get('/auth/me');
+      if (data.success) {
+        setUser(data.data);
+      }
+    } catch (err) {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout');
+      setUser(null);
+      window.location.href = '/login';
+    } catch (err) {
+      toast.error('Failed to logout');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  const Layout = ({ children }: { children: React.ReactNode }) => (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors">
+      <header className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center transition-colors">
+        <div className="flex items-center space-x-4">
+          <span className="font-bold text-xl text-primary-600 dark:text-primary-500">API Pulse</span>
+        </div>
+        <div className="flex items-center space-x-4">
+          {user && (
+            <span className="text-sm text-slate-500 dark:text-slate-400 hidden sm:inline">{user.email}</span>
+          )}
+          <ThemeToggle />
+          {user && (
+            <button 
+              onClick={handleLogout}
+              className="text-sm font-medium text-red-500 hover:text-red-600 transition"
+            >
+              Logout
+            </button>
+          )}
+        </div>
+      </header>
+      <main className="flex-1 p-4 max-w-7xl mx-auto w-full">
+        {children}
+      </main>
+    </div>
+  );
 
   return (
     <Router>
       <Toaster position="top-right" />
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+        <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
         <Route path="/*" element={
-          <PrivateRoute>
+          user ? (
             <Layout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -66,7 +113,7 @@ function App() {
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </Layout>
-          </PrivateRoute>
+          ) : <Navigate to="/login" />
         } />
       </Routes>
     </Router>

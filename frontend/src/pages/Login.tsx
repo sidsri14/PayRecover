@@ -16,8 +16,7 @@ const Login: React.FC = () => {
     
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      if (data.success && data.data.token) {
-        localStorage.setItem('token', data.data.token);
+      if (data.success) {
         toast.success('Welcome back!');
         // We do a hard reload to reset the app state with new auth context
         setTimeout(() => {

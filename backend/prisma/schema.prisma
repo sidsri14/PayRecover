@@ -35,6 +35,7 @@ model Monitor {
   lastCheckedAt DateTime?
   logs          Log[]
   alerts        Alert[]
+  incidents     Incident[]
 }
 
 model Log {
@@ -53,4 +54,14 @@ model Alert {
   monitor   Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
   type      String   @default("EMAIL")
   sentAt    DateTime @default(now())
+}
+
+model Incident {
+  id           String    @id @default(uuid())
+  monitorId    String
+  monitor      Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  startedAt    DateTime  @default(now())
+  resolvedAt   DateTime?           // null = still OPEN
+  durationSecs Int?                // set on resolution
+  cause        String?             // e.g. "Connection refused", "Timeout"
 }

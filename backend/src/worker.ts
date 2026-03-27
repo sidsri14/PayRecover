@@ -2,8 +2,10 @@ import { prisma } from './utils/prisma.js';
 import { sendAlertEmail } from './services/email.service.js';
 import pLimit from 'p-limit';
 import pino from 'pino';
+import http from 'http';
+import https from 'https';
 import type { Monitor } from '@prisma/client';
-import { validateUrlForSSRF } from './utils/security.js';
+import { validateUrlForSSRF, createSafeAgent } from './utils/security.js';
 
 const logger = pino({
   transport: {
@@ -17,21 +19,36 @@ const limit = pLimit(10); // Phase 3: Bounded concurrency
 let isShuttingDown = false;
 let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
-// Phase 3: Retry wrapper for transient network jitter
+// Phase 2: TOCTOU-safe fetch using Node http agent that re-validates IP at connect time
+const fetchWithAgent = (url: string, method: string): Promise<{ status: number; ok: boolean }> => {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const isHttps = parsed.protocol === 'https:';
+    const agent = createSafeAgent(isHttps ? 'https' : 'http');
+    const lib = isHttps ? https : http;
+
+    const req = lib.request(
+      { hostname: parsed.hostname, port: parsed.port || (isHttps ? 443 : 80), path: parsed.pathname + parsed.search, method, agent },
+      (res) => {
+        res.resume(); // drain body
+        const status = res.statusCode ?? 0;
+        resolve({ status, ok: status >= 200 && status < 300 });
+      }
+    );
+    req.setTimeout(10000, () => { req.destroy(new Error('Request timeout')); });
+    req.on('error', reject);
+    req.end();
+  });
+};
+
+// Phase 3: Retry wrapper with exponential backoff
 const fetchWithRetry = async (url: string, method: string, retries = 3) => {
   for (let i = 0; i < retries; i++) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); 
-      const response = await fetch(url, {
-        method,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      return response;
+      return await fetchWithAgent(url, method);
     } catch (error) {
       if (i === retries - 1) throw error;
-      await new Promise(r => setTimeout(r, 1000 * (i + 1))); // Exponential backoff
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
     }
   }
   throw new Error("Unreachable");

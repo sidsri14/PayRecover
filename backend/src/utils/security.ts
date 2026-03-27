@@ -1,5 +1,7 @@
 import ipaddr from 'ipaddr.js';
 import dns from 'dns';
+import http from 'http';
+import https from 'https';
 import { promisify } from 'util';
 
 const resolve4 = promisify(dns.resolve4);
@@ -25,6 +27,10 @@ export const isPrivateIP = (ip: string): boolean => {
 export const validateUrlForSSRF = async (urlStr: string): Promise<boolean> => {
   try {
     const url = new URL(urlStr);
+    
+    // Only allow HTTP and HTTPS
+    if (!['http:', 'https:'].includes(url.protocol)) return false;
+    
     const hostname = url.hostname;
 
     // 1. Block literal private IPs in the URL
@@ -32,10 +38,8 @@ export const validateUrlForSSRF = async (urlStr: string): Promise<boolean> => {
       if (isPrivateIP(hostname)) return false;
     }
 
-    // 2. Resolve DNS and check result IPs to prevent DNS rebinding or simple host manipulation
+    // 2. Resolve DNS and check result IPs
     try {
-      // Note: This is a basic check. Production systems might use a custom fetch agent 
-      // that validates the IP *at the time of connection* to prevent TOCTOU.
       const ipv4s = await resolve4(hostname).catch(() => []);
       const ipv6s = await resolve6(hostname).catch(() => []);
       const allIps = [...ipv4s, ...ipv6s];
@@ -43,13 +47,38 @@ export const validateUrlForSSRF = async (urlStr: string): Promise<boolean> => {
       for (const ip of allIps) {
         if (isPrivateIP(ip)) return false;
       }
-    } catch (dnsErr) {
-      // If DNS fails, we can't reliably check, but we block if it was a hostname
-      // Actually, if it's not an IP and DNS fails, it's unreachable anyway.
+    } catch {
+      // DNS failure = treat as safe to attempt (the fetch will fail anyway)
     }
 
     return true;
   } catch (err) {
     return false;
   }
+};
+
+/**
+ * Phase 2: TOCTOU-safe HTTP Agent
+ * Creates an http/https agent that validates the destination IP *at socket
+ * connection time* — closing the DNS-rebinding race window that exists when
+ * you only check DNS before the fetch.
+ */
+export const createSafeAgent = (protocol: 'http' | 'https') => {
+  const AgentClass = protocol === 'https' ? https.Agent : http.Agent;
+
+  return new AgentClass({
+    lookup: (hostname: string, options: any, callback: any) => {
+      dns.lookup(hostname, options, (err, address, family) => {
+        if (err) return callback(err, address, family);
+        if (isPrivateIP(address)) {
+          return callback(
+            new Error(`SSRF Block: Resolved IP ${address} is in a private/reserved range`),
+            address,
+            family
+          );
+        }
+        callback(null, address, family);
+      });
+    },
+  } as any);
 };
