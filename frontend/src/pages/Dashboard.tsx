@@ -134,14 +134,9 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortDir('asc'); }
-  };
-
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return [...monitors]
+    return monitors
       .filter(m => m.url.toLowerCase().includes(q) || m.method.toLowerCase().includes(q))
       .sort((a, b) => {
         let cmp = 0;
@@ -159,9 +154,19 @@ const Dashboard: React.FC = () => {
       });
   }, [monitors, search, sortKey, sortDir]);
 
-  const upCount = monitors.filter(m => m.status === 'UP').length;
   const downCount = monitors.filter(m => m.status === 'DOWN').length;
-  const uptimePct = monitors.length > 0 ? Math.round((upCount / monitors.length) * 100) : 0;
+  const upCount = monitors.filter(m => m.status === 'UP').length;
+  const avgLatency = monitors.length > 0 
+    ? Math.round(monitors.reduce((acc, m) => acc + (m.avgResponseTime || 0), 0) / monitors.length) 
+    : 0;
+  const uptimePct = monitors.length > 0 
+    ? parseFloat(((upCount / monitors.length) * 100).toFixed(1)) 
+    : 100;
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
 
   // ── Initial skeleton load
   if (loading && monitors.length === 0) {
@@ -229,29 +234,53 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      {/* ── Active Incidents Alert */}
+      {downCount > 0 && (
+        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl overflow-hidden">
+            <div className="p-4 bg-red-100/50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-900/30 flex items-center justify-between">
+              <div className="flex items-center text-red-700 dark:text-red-400 font-bold">
+                <AlertCircle className="w-5 h-5 mr-2" />
+                Active Incidents ({downCount})
+              </div>
+            </div>
+            <div className="divide-y divide-red-100 dark:divide-red-900/20">
+              {monitors.filter(m => m.status === 'DOWN').map(m => (
+                <div key={m.id} className="p-4 flex items-center justify-between hover:bg-red-100/30 dark:hover:bg-red-900/5 transition cursor-pointer" onClick={() => navigate(`/monitors/${m.id}`)}>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-red-900 dark:text-red-300">{m.url}</span>
+                    <span className="text-xs text-red-600 dark:text-red-500 mt-1 flex items-center">
+                      <ServerCrash className="w-3 h-3 mr-1" /> Critical Failure Detected
+                    </span>
+                  </div>
+                  <button className="text-xs font-semibold text-red-700 dark:text-red-400 hover:underline">View Details →</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
-          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">Total</span>
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Monitors</span>
           <div className="text-3xl font-bold text-slate-800 dark:text-white mt-2">{monitors.length}</div>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-emerald-100 dark:border-emerald-900/40 transition-colors">
-          <span className="text-emerald-600 dark:text-emerald-500 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
-            <Activity className="w-3.5 h-3.5" /> Healthy
-          </span>
-          <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-500 mt-2">{upCount}</div>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">Avg Latency</span>
+          <div className="text-3xl font-bold text-slate-800 dark:text-white mt-2">{avgLatency}<span className="text-sm font-medium text-slate-400 ml-1">ms</span></div>
         </div>
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-red-100 dark:border-red-900/40 transition-colors">
           <span className="text-red-500 dark:text-red-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
-            <ServerCrash className="w-3.5 h-3.5" /> Failing
+            <ServerCrash className="w-3.5 h-3.5" /> Failing Now
           </span>
           <div className="text-3xl font-bold text-red-500 dark:text-red-400 mt-2">{downCount}</div>
         </div>
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-primary-100 dark:border-primary-900/40 transition-colors">
-          <span className="text-primary-600 dark:text-primary-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
+          <span className="text-primary-600 dark:text-primary-500 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
             <Shield className="w-3.5 h-3.5" /> Uptime
           </span>
-          <div className={`text-3xl font-bold mt-2 ${uptimePct === 100 ? 'text-emerald-600 dark:text-emerald-500' : uptimePct >= 80 ? 'text-amber-500' : 'text-red-500'}`}>
+          <div className={`text-3xl font-bold mt-2 ${uptimePct >= 99 ? 'text-emerald-600 dark:text-emerald-500' : uptimePct >= 95 ? 'text-amber-500' : 'text-red-500'}`}>
             {monitors.length === 0 ? '—' : `${uptimePct}%`}
           </div>
         </div>

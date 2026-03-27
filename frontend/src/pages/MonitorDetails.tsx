@@ -14,15 +14,23 @@ interface Log {
   createdAt: string;
 }
 
+interface Incident {
+  id: string;
+  startedAt: string;
+  resolvedAt: string | null;
+  durationSecs: number | null;
+  cause: string | null;
+}
+
 interface Monitor {
   id: string;
-  projectId: string;
   url: string;
   method: string;
   interval: number;
   status: string;
-  lastCheckedAt?: string;
+  lastCheckedAt: string | null;
   logs: Log[];
+  incidents: Incident[];
 }
 
 const MonitorDetails: React.FC = () => {
@@ -162,6 +170,53 @@ const MonitorDetails: React.FC = () => {
           ) : (
             <div className="h-full flex items-center justify-center text-slate-400">Not enough data to graph yet.</div>
           )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors mb-8">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800 dark:text-white">Incident History</h3>
+          <span className="text-xs text-slate-500 font-medium">Last 20 events</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="p-4">Status</th>
+                <th className="p-4">Started</th>
+                <th className="p-4">Resolved</th>
+                <th className="p-4">Duration</th>
+                <th className="p-4">Cause</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+              {monitor.incidents && monitor.incidents.length > 0 ? monitor.incidents.map((incident) => (
+                <tr key={incident.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                  <td className="p-4">
+                    {!incident.resolvedAt ? (
+                      <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 uppercase">Open</span>
+                    ) : (
+                      <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase">Resolved</span>
+                    )}
+                  </td>
+                  <td className="p-4 text-slate-600 dark:text-slate-400">{new Date(incident.startedAt).toLocaleString()}</td>
+                  <td className="p-4 text-slate-600 dark:text-slate-400">
+                    {incident.resolvedAt ? new Date(incident.resolvedAt).toLocaleString() : '—'}
+                  </td>
+                  <td className="p-4 text-slate-600 dark:text-slate-400 font-medium">
+                    {incident.durationSecs ? `${Math.floor(incident.durationSecs / 60)}m ${incident.durationSecs % 60}s` : '—'}
+                  </td>
+                  <td className="p-4 text-slate-500 italic max-w-xs truncate" title={incident.cause || 'No cause logged'}>
+                    {incident.cause || 'Unknown'}
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-slate-400">No major incidents recorded.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

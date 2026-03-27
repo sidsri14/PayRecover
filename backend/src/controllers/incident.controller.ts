@@ -3,27 +3,27 @@ import { prisma } from '../utils/prisma.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 
 /**
- * GET /api/incidents  — all incidents across all monitors for this user (paginated, latest first)
+ * GET /api/incidents  — all incidents across all monitors for this user
  */
 export const getIncidents = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // Collect all monitor IDs for this user
-    const monitors = await prisma.monitor.findMany({
-      where: { project: { userId: req.userId } },
-      select: { id: true },
-    });
-    const monitorIds = monitors.map(m => m.id);
+    const incidents: any[] = await prisma.$queryRaw`
+      SELECT i.*, m.url, m."method"
+      FROM "Incident" i
+      JOIN "Monitor" m ON i."monitorId" = m.id
+      JOIN "Project" p ON m."projectId" = p.id
+      WHERE p."userId" = ${req.userId}
+      ORDER BY i."startedAt" DESC
+      LIMIT 50
+    `;
 
-    const incidents = await prisma.incident.findMany({
-      where: { monitorId: { in: monitorIds } },
-      orderBy: { startedAt: 'desc' },
-      take: 50,
-      include: {
-        monitor: { select: { url: true, method: true } },
-      },
-    });
+    // Map to include monitor object for frontend compatibility if needed
+    const formatted = incidents.map(inc => ({
+      ...inc,
+      monitor: { url: inc.url, method: inc.method }
+    }));
 
-    successResponse(res, incidents);
+    successResponse(res, formatted);
   } catch (error) {
     next(error);
   }
@@ -36,20 +36,15 @@ export const getMonitorIncidents = async (req: any, res: Response, next: NextFun
   try {
     const { id } = req.params;
 
-    // Verify ownership
-    const monitor = await prisma.monitor.findFirst({
-      where: { id, project: { userId: req.userId } },
-    });
-    if (!monitor) {
-      errorResponse(res, 'Monitor not found', 404);
-      return;
-    }
-
-    const incidents = await prisma.incident.findMany({
-      where: { monitorId: id },
-      orderBy: { startedAt: 'desc' },
-      take: 20,
-    });
+    const incidents: any[] = await prisma.$queryRaw`
+      SELECT i.*
+      FROM "Incident" i
+      JOIN "Monitor" m ON i."monitorId" = m.id
+      JOIN "Project" p ON m."projectId" = p.id
+      WHERE i."monitorId" = ${id} AND p."userId" = ${req.userId}
+      ORDER BY i."startedAt" DESC
+      LIMIT 20
+    `;
 
     successResponse(res, incidents);
   } catch (error) {
@@ -62,32 +57,40 @@ export const getMonitorIncidents = async (req: any, res: Response, next: NextFun
  */
 export const resolveIncident = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const incident = await prisma.incident.findFirst({
-      where: {
-        id: req.params.id,
-        monitor: { project: { userId: req.userId } },
-      },
-    });
+    const { id } = req.params;
+    
+    // 1. Find the incident and check ownership
+    const incidents: any[] = await prisma.$queryRaw`
+      SELECT i.id, i."startedAt", i."resolvedAt"
+      FROM "Incident" i
+      JOIN "Monitor" m ON i."monitorId" = m.id
+      JOIN "Project" p ON m."projectId" = p.id
+      WHERE i.id = ${id} AND p."userId" = ${req.userId}
+      LIMIT 1
+    `;
 
-    if (!incident) {
+    if (incidents.length === 0) {
       errorResponse(res, 'Incident not found', 404);
       return;
     }
 
-    if (incident.resolvedAt) {
+    const inc = incidents[0];
+    if (inc.resolvedAt) {
       errorResponse(res, 'Incident is already resolved', 400);
       return;
     }
 
-    const now = new Date();
-    const durationSecs = Math.round((now.getTime() - incident.startedAt.getTime()) / 1000);
+    const resolvedAt = new Date();
+    const startedAt = new Date(inc.startedAt);
+    const durationSecs = Math.floor((resolvedAt.getTime() - startedAt.getTime()) / 1000);
 
-    const updated = await prisma.incident.update({
-      where: { id: incident.id },
-      data: { resolvedAt: now, durationSecs },
-    });
+    await prisma.$executeRaw`
+      UPDATE "Incident" 
+      SET "resolvedAt" = ${resolvedAt}, "durationSecs" = ${durationSecs}
+      WHERE id = ${id}
+    `;
 
-    successResponse(res, updated);
+    successResponse(res, { id, resolvedAt, durationSecs });
   } catch (error) {
     next(error);
   }

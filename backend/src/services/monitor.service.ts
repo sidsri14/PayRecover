@@ -68,6 +68,7 @@ export class MonitorService {
       where: { id: monitorId, projectId: project.id },
       include: {
         logs: { orderBy: { createdAt: 'desc' }, take: 50 },
+        // incidents: { orderBy: { startedAt: 'desc' }, take: 20 }, // Removed for raw query
       },
     });
 
@@ -77,7 +78,15 @@ export class MonitorService {
       throw error;
     }
 
-    return monitor;
+    // Include incidents via raw JOIN or separate query
+    const incidents: any[] = await prisma.$queryRaw`
+      SELECT * FROM "Incident" 
+      WHERE "monitorId" = ${monitorId} 
+      ORDER BY "startedAt" DESC 
+      LIMIT 20
+    `;
+
+    return { ...monitor, incidents };
   }
 
   static async deleteMonitor(userId: string, monitorId: string) {
@@ -94,9 +103,11 @@ export class MonitorService {
     }
 
     // Execute deletion atomically to prevent race condition locks from the background worker
+    // Phase 6: Include cleanup of incidents
     await prisma.$transaction([
       prisma.log.deleteMany({ where: { monitorId } }),
       prisma.alert.deleteMany({ where: { monitorId } }),
+      prisma.incident.deleteMany({ where: { monitorId } }),
       prisma.monitor.delete({ where: { id: monitorId } })
     ]);
 

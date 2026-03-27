@@ -94,6 +94,8 @@ const executeCheck = async (monitor: Monitor) => {
 
   logger.debug(`[Queue Executing] Checking ${monitor.url} [${monitor.method}]`);
 
+  let errorMsg: string | null = null;
+
   try {
     // Phase 5: SSRF Check
     const isSafe = await validateUrlForSSRF(monitor.url);
@@ -105,15 +107,21 @@ const executeCheck = async (monitor: Monitor) => {
     statusCode = response.status;
     if (response.ok) {
       status = 'UP';
+    } else {
+      errorMsg = `HTTP Error: ${statusCode}`;
     }
   } catch (error) {
-    logger.warn(`Monitor ${monitor.url} is DOWN: ${(error as Error).message}`);
+    errorMsg = (error as Error).message;
+    logger.warn(`Monitor ${monitor.url} check failed: ${errorMsg}`);
     status = 'DOWN';
   }
 
   const responseTime = Math.round(performance.now() - startTime);
   const previousStatus = monitor.status;
-  const statusChanged = previousStatus !== 'PENDING' && previousStatus !== status;
+  // An incident should be managed if status is DOWN (regardless of change from PENDING) 
+  // or if a status change has occurred.
+  const isDown = status === 'DOWN';
+  const statusChanged = previousStatus !== status;
 
   // Log the unified result
   await prisma.log.create({
@@ -134,37 +142,71 @@ const executeCheck = async (monitor: Monitor) => {
     }
   });
 
-  // Alert orchestration
-  if (statusChanged && status === 'DOWN') {
-    // Phase 3: Anti-Spam (Flapping Protection) - Check if alert was sent in the last 15 minutes
-    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const recentAlert = await prisma.alert.findFirst({
-      where: {
-        monitorId: monitor.id,
-        sentAt: { gte: fifteenMinsAgo }
+  // Phase 6: Incident Management & Alerting
+  if (isDown || statusChanged) {
+    if (isDown) {
+      // 1. Open new incident if none exists already for this monitor
+      const existingOpen = await prisma.incident.findFirst({
+        where: { monitorId: monitor.id, resolvedAt: null }
+      });
+      
+      if (!existingOpen) {
+        logger.info(`Opening new incident for ${monitor.url}`);
+        await prisma.incident.create({
+          data: {
+            monitorId: monitor.id,
+            cause: errorMsg || 'Unknown failure',
+            startedAt: new Date()
+          }
+        });
       }
-    });
 
-    if (!recentAlert) {
-      logger.info(`Triggering active DOWN alert for ${monitor.url}`);
-      await prisma.alert.create({
-        data: {
+      // 2. Alert orchestration (Anti-Spam / Flapping Protection)
+      const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+      const recentAlert = await prisma.alert.findFirst({
+        where: {
           monitorId: monitor.id,
-          type: 'EMAIL',
+          sentAt: { gte: fifteenMinsAgo }
         }
       });
-      
-      // Deferred joined fetch: Only query Project Owner context if an alert is strictly firing
-      const projectWithUser = await prisma.project.findUnique({
-        where: { id: monitor.projectId },
-        include: { user: true }
-      });
-      
-      if (projectWithUser?.user?.email) {
-        await sendAlertEmail(projectWithUser.user.email, monitor.url, status, statusCode);
+
+      if (!recentAlert) {
+        logger.info(`Triggering active DOWN alert for ${monitor.url}`);
+        await prisma.alert.create({
+          data: { monitorId: monitor.id, type: 'EMAIL' }
+        });
+
+        // Fetch user context for email
+        const projectWithUser = await prisma.project.findUnique({
+          where: { id: monitor.projectId },
+          include: { user: true }
+        });
+
+        if (projectWithUser?.user?.email) {
+          await sendAlertEmail(projectWithUser.user.email, monitor.url, status, statusCode);
+        }
+      } else {
+        logger.info(`Suppressed duplicate DOWN alert for ${monitor.url} (15m Cooldown active)`);
       }
-    } else {
-      logger.info(`Suppressed duplicate DOWN alert for ${monitor.url} (15m Cooldown active)`);
+    } else if (status === 'UP') {
+      // Resolve any open incidents
+      const openIncidents: any[] = await prisma.$queryRaw`
+        SELECT id, "startedAt" FROM "Incident" 
+        WHERE "monitorId" = ${monitor.id} AND "resolvedAt" IS NULL
+      `;
+
+      for (const inc of openIncidents) {
+        const resolvedAt = new Date();
+        const startedAt = new Date(inc.startedAt);
+        const durationSecs = Math.floor((resolvedAt.getTime() - startedAt.getTime()) / 1000);
+        
+        await prisma.$executeRaw`
+          UPDATE "Incident" 
+          SET "resolvedAt" = ${resolvedAt}, "durationSecs" = ${durationSecs}
+          WHERE id = ${inc.id}
+        `;
+        logger.info(`Resolved incident ${inc.id} for monitor ${monitor.id}`);
+      }
     }
   }
 };
