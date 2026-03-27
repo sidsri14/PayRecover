@@ -420,10 +420,10 @@ const Dashboard: React.FC = () => {
 
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(monitor.id); }}
-                    className="text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition opacity-0 group-hover:opacity-100 cursor-pointer p-2 z-10 ml-2"
+                    className="text-slate-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition cursor-pointer p-2 z-10 ml-2"
                     title="Delete Monitor"
                   >
-                    <Trash2 className="w-5 h-5 pointer-events-none" />
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
               </li>

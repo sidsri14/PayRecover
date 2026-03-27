@@ -1,27 +1,39 @@
 import { PrismaClient } from '@prisma/client';
-
+// @ts-ignore
+import process from 'process';
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log('Adding "name" column to "Monitor" table...');
+async function migrate() {
   try {
-    // Standard PostgreSQL ALTER TABLE
-    // We use COALESCE(url, 'New Monitor') as a fallback for existing rows
+    console.log('Migrating "Monitor" table...');
+    // Add "name" column if it doesn't exist
     await prisma.$executeRawUnsafe(`
-      ALTER TABLE "Monitor" ADD COLUMN IF NOT EXISTS "name" VARCHAR(100);
+      ALTER TABLE "Monitor" ADD COLUMN IF NOT EXISTS "name" VARCHAR(255);
     `);
     
+    // Default "name" to "url" for existing records
     await prisma.$executeRawUnsafe(`
-      UPDATE "Monitor" SET "name" = url WHERE "name" IS NULL;
+      UPDATE "Monitor" SET "name" = "url" WHERE "name" IS NULL;
     `);
 
-    console.log('Migration successful: "name" column added and populated.');
+    console.log('Migrating "Incident" table...');
+    // Add "status" column if it doesn't exist (INVESTIGATING, RESOLVED, etc.)
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Incident" ADD COLUMN IF NOT EXISTS "status" VARCHAR(50) DEFAULT 'INVESTIGATING';
+    `);
+
+    // Ensure RESOLVED status for resolved incidents
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Incident" SET "status" = 'RESOLVED' WHERE "resolvedAt" IS NOT NULL;
+    `);
+
+    console.log('Migration completed successfully.');
   } catch (err) {
     console.error('Migration failed:', err);
-    process.exit(1);
   } finally {
     await prisma.$disconnect();
+    process.exit(0);
   }
 }
 
-main();
+migrate();

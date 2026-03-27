@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -103,7 +104,7 @@ app.use('/api/incidents', incidentRoutes);
 app.get('/api/public/status', async (req, res) => {
   try {
     const monitors: any[] = await prisma.$queryRaw`
-      SELECT id, name, url, status, "lastCheckedAt" FROM "Monitor"
+      SELECT id, "name", url, status, "lastCheckedAt" FROM "Monitor"
     `;
     const formatted = monitors.map(m => ({
       id: m.id,

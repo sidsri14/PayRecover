@@ -40,28 +40,32 @@ export class MonitorService {
       throw error;
     }
 
-    const monitor = await prisma.monitor.create({
-      data: {
-        id: crypto.randomUUID(),
-        projectId: project.id,
-        name: name || url,
-        url,
-        method,
-        interval: Number(interval),
-        status: 'UP',
-        failureCount: 0,
-      },
-    });
+    const monitorId = crypto.randomUUID();
+    await prisma.$executeRaw`
+      INSERT INTO "Monitor" (id, "projectId", "name", url, method, interval, status, "failureCount")
+      VALUES (${monitorId}, ${project.id}, ${name || url}, ${url}, ${method}, ${Number(interval)}, 'UP', 0)
+    `;
 
-    return monitor;
+    return {
+      id: monitorId,
+      projectId: project.id,
+      name: name || url,
+      url,
+      method,
+      interval: Number(interval),
+      status: 'UP',
+      failureCount: 0,
+    };
   }
 
   static async getMonitors(userId: string) {
     const project = await this.getDefaultProject(userId);
-    const monitors = await prisma.monitor.findMany({
-      where: { projectId: project.id },
-      orderBy: { id: 'desc' },
-    });
+    const monitors: any[] = await prisma.$queryRaw`
+      SELECT id, "name" AS "name", url, method, interval, status, "failureCount", "projectId", "lastCheckedAt" 
+      FROM "Monitor" 
+      WHERE "projectId" = ${project.id} 
+      ORDER BY id DESC
+    `;
 
     const uptimeStats: any[] = await prisma.$queryRaw`
       SELECT 
@@ -98,18 +102,24 @@ export class MonitorService {
   static async getMonitorById(userId: string, monitorId: string) {
     const project = await this.getDefaultProject(userId);
 
-    const monitor = await prisma.monitor.findFirst({
-      where: { id: monitorId, projectId: project.id },
-      include: {
-        logs: { orderBy: { createdAt: 'desc' }, take: 50 },
-      },
-    });
+    const monitors: any[] = await prisma.$queryRaw`
+      SELECT id, "name" AS "name", url, method, interval, status, "failureCount", "projectId", "lastCheckedAt"
+      FROM "Monitor" 
+      WHERE id = ${monitorId} AND "projectId" = ${project.id}
+    `;
+    const monitor = monitors[0];
 
     if (!monitor) {
       const error = new Error('Monitor not found');
       (error as any).status = 404;
       throw error;
     }
+
+    const logs = await prisma.log.findMany({
+      where: { monitorId },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
 
     // Include incidents via raw SQL
     const incidents: any[] = await prisma.$queryRaw`
@@ -133,7 +143,7 @@ export class MonitorService {
       ? parseFloat(((stats.up / stats.total) * 100).toFixed(2)) 
       : 100;
 
-    return { ...monitor, incidents, uptime30d };
+    return { ...monitor, logs, incidents, uptime30d };
   }
 
   static async deleteMonitor(userId: string, monitorId: string) {

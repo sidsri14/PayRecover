@@ -128,14 +128,11 @@ const executeCheck = async (monitor: Monitor) => {
   const statusChanged = previousStatus !== effectiveStatus;
   const isEffectivelyDown = effectiveStatus === 'DOWN';
 
-  await prisma.monitor.update({
-    where: { id: monitor.id },
-    data: {
-      status: effectiveStatus,
-      failureCount: nextFailureCount,
-      lastCheckedAt: new Date(),
-    },
-  });
+  await prisma.$executeRaw`
+    UPDATE "Monitor" 
+    SET status = ${effectiveStatus}, "failureCount" = ${nextFailureCount}, "lastCheckedAt" = ${new Date()}
+    WHERE id = ${monitor.id}
+  `;
 
   // Phase 6: Incident Management & Alerting
   if (isEffectivelyDown || statusChanged) {
@@ -147,13 +144,10 @@ const executeCheck = async (monitor: Monitor) => {
       
       if (!existingOpen) {
         logger.info(`Opening new incident for ${monitor.url}`);
-        await prisma.incident.create({
-          data: {
-            monitorId: monitor.id,
-            cause: errorMsg || 'Unknown failure',
-            startedAt: new Date()
-          }
-        });
+        await prisma.$executeRaw`
+          INSERT INTO "Incident" (id, "monitorId", cause, "startedAt", status)
+          VALUES (${crypto.randomUUID()}, ${monitor.id}, ${errorMsg || 'Unknown failure'}, ${new Date()}, 'INVESTIGATING')
+        `;
       }
 
       // 2. Alert orchestration (Anti-Spam / Flapping Protection)
@@ -197,7 +191,7 @@ const executeCheck = async (monitor: Monitor) => {
         
         await prisma.$executeRaw`
           UPDATE "Incident" 
-          SET "resolvedAt" = ${resolvedAt}, "durationSecs" = ${durationSecs}
+          SET "resolvedAt" = ${resolvedAt}, "durationSecs" = ${durationSecs}, "status" = 'RESOLVED'
           WHERE id = ${inc.id}
         `;
         logger.info(`Resolved incident ${inc.id} for monitor ${monitor.id}`);
