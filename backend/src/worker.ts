@@ -1,81 +1,97 @@
-import { prisma } from './utils/prisma';
-import { sendAlertEmail } from './services/email.service';
+import { prisma } from './utils/prisma.js';
+import { sendAlertEmail } from './services/email.service.js';
+import pLimit from 'p-limit';
+import pino from 'pino';
+import type { Monitor } from '@prisma/client';
 
-interface MonitorWithProject {
-  id: string;
-  url: string;
-  method: string;
-  interval: number;
-  status: string;
-  lastCheckedAt: Date | null;
-  project: {
-    user: {
-      email: string;
-    };
-  };
-}
+const logger = pino({
+  transport: {
+    target: 'pino-pretty',
+    options: { colorize: true }
+  }
+});
 
-const CHECK_INTERVAL_MS = 10 * 1000; // Worker ticks every 10 seconds to check for due monitors
+const CHECK_INTERVAL_MS = 10 * 1000; 
+const limit = pLimit(10); // Phase 3: Bounded concurrency
+let isShuttingDown = false;
+let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+// Phase 3: Retry wrapper for transient network jitter
+const fetchWithRetry = async (url: string, method: string, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); 
+      const response = await fetch(url, {
+        method,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await new Promise(r => setTimeout(r, 1000 * (i + 1))); // Exponential backoff
+    }
+  }
+  throw new Error("Unreachable");
+};
 
 const checkMonitors = async () => {
-  console.log(`[Worker] Ticking... checking for monitors to test.`);
+  if (isShuttingDown) return;
+  
+  logger.info('Ticking... querying database for due monitors.');
+  
   try {
-    const monitors = await prisma.monitor.findMany({
-      include: {
-        project: {
-          include: { user: true }
-        }
-      }
-    });
+    // Phase 3: Query ONLY due monitors using Raw Postgres SQL for massive indexing efficiency
+    const dueMonitors = await prisma.$queryRaw<Monitor[]>`
+      SELECT * FROM "Monitor" 
+      WHERE "lastCheckedAt" IS NULL 
+      OR "lastCheckedAt" + ("interval" * interval '1 second') <= NOW()
+    `;
 
-    const now = new Date();
-
-    for (const monitor of monitors) {
-      if (!monitor.lastCheckedAt || (now.getTime() - monitor.lastCheckedAt.getTime()) >= (monitor.interval * 1000)) {
-        await executeCheck(monitor);
-      }
+    if (dueMonitors.length === 0) {
+      logger.debug('No monitors due for checking.');
+    } else {
+      logger.info(`Dispatched ${dueMonitors.length} monitor(s) to concurrent queue.`);
+      
+      // Phase 3: Execute with bounded p-limit
+      await Promise.all(
+        dueMonitors.map(monitor => limit(() => executeCheck(monitor)))
+      );
     }
   } catch (error) {
-    console.error(`[Worker Error] Failed to fetch monitors:`, error);
+    logger.error({ err: error }, 'Failed to process monitor batch');
   } finally {
-    // Schedule the next tick recursively only AFTER the current one gracefully finishes
-    setTimeout(checkMonitors, CHECK_INTERVAL_MS);
+    if (!isShuttingDown) {
+      // Recursive timeout prevents overlapping ticks
+      timeoutHandle = setTimeout(checkMonitors, CHECK_INTERVAL_MS);
+    }
   }
 };
 
-const executeCheck = async (monitor: MonitorWithProject) => {
+const executeCheck = async (monitor: Monitor) => {
   const startTime = performance.now();
   let statusCode: number | null = null;
   let status = 'DOWN';
 
-  console.log(`[Worker] Checking monitor ${monitor.url}...`);
+  logger.debug(`[Queue Executing] Checking ${monitor.url} [${monitor.method}]`);
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-    const response = await fetch(monitor.url, {
-      method: monitor.method,
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeoutId);
-
+    const response = await fetchWithRetry(monitor.url, monitor.method);
     statusCode = response.status;
     if (response.ok) {
       status = 'UP';
     }
   } catch (error) {
+    logger.warn(`Monitor ${monitor.url} is DOWN: ${(error as Error).message}`);
     status = 'DOWN';
   }
 
   const responseTime = Math.round(performance.now() - startTime);
-
-  // Determine if status changed
   const previousStatus = monitor.status;
   const statusChanged = previousStatus !== 'PENDING' && previousStatus !== status;
 
-  // Log the result
+  // Log the unified result
   await prisma.log.create({
     data: {
       monitorId: monitor.id,
@@ -85,7 +101,7 @@ const executeCheck = async (monitor: MonitorWithProject) => {
     }
   });
 
-  // Update monitor status
+  // Update physical monitor status state
   await prisma.monitor.update({
     where: { id: monitor.id },
     data: {
@@ -94,23 +110,58 @@ const executeCheck = async (monitor: MonitorWithProject) => {
     }
   });
 
-  // Alert logic
+  // Alert orchestration
   if (statusChanged && status === 'DOWN') {
-    await prisma.alert.create({
-      data: {
+    // Phase 3: Anti-Spam (Flapping Protection) - Check if alert was sent in the last 15 minutes
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const recentAlert = await prisma.alert.findFirst({
+      where: {
         monitorId: monitor.id,
-        type: 'EMAIL',
+        sentAt: { gte: fifteenMinsAgo }
       }
     });
-    
-    const userEmail = monitor.project.user.email;
-    await sendAlertEmail(userEmail, monitor.url, status, statusCode);
+
+    if (!recentAlert) {
+      logger.info(`Triggering active DOWN alert for ${monitor.url}`);
+      await prisma.alert.create({
+        data: {
+          monitorId: monitor.id,
+          type: 'EMAIL',
+        }
+      });
+      
+      // Deferred joined fetch: Only query Project Owner context if an alert is strictly firing
+      const projectWithUser = await prisma.project.findUnique({
+        where: { id: monitor.projectId },
+        include: { user: true }
+      });
+      
+      if (projectWithUser?.user?.email) {
+        await sendAlertEmail(projectWithUser.user.email, monitor.url, status, statusCode);
+      }
+    } else {
+      logger.info(`Suppressed duplicate DOWN alert for ${monitor.url} (15m Cooldown active)`);
+    }
   }
 };
 
 const startWorker = () => {
-  console.log('[Worker] Starting background monitor worker with recursive timeouts...');
-  setTimeout(checkMonitors, CHECK_INTERVAL_MS);
+  logger.info('Starting Resilient Background Monitor Worker...');
+  checkMonitors();
 };
 
 startWorker();
+
+// Phase 3: Graceful Shutdown Hook
+const shutdown = async (signal: string) => {
+  logger.info(`\nReceived ${signal}. Gracefully draining queue and shutting down...`);
+  isShuttingDown = true;
+  if (timeoutHandle) clearTimeout(timeoutHandle);
+  
+  await prisma.$disconnect();
+  logger.info('Worker disconnected safely. Exiting.');
+  process.exit(0);
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

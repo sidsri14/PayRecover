@@ -1,93 +1,48 @@
 import type { Request, Response, NextFunction } from 'express';
-import bcrypt from 'bcrypt';
-import { prisma } from '../utils/prisma.js';
-import { generateToken } from '../utils/jwt.js';
+import { AuthService } from '../services/auth.service.js';
+import { successResponse, errorResponse } from '../utils/apiResponse.js';
+import { prisma } from '../utils/prisma.js'; // Needed for getMe
 
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      res.status(400).json({ success: false, error: 'Email and password are required' });
-      return;
+    const data = await AuthService.register(req.body);
+    successResponse(res, data, 201);
+  } catch (error: any) {
+    if (error.message === 'User already exists') {
+      errorResponse(res, error.message, 400);
+    } else {
+      next(error);
     }
-
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      res.status(400).json({ success: false, error: 'User already exists' });
-      return;
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-      },
-    });
-
-    const token = generateToken(user.id);
-
-    res.status(201).json({
-      success: true,
-      data: {
-        user: { id: user.id, email: user.email },
-        token,
-      },
-    });
-  } catch (error) {
-    next(error);
   }
 };
 
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      res.status(400).json({ success: false, error: 'Email and password are required' });
-      return;
+    const data = await AuthService.login(req.body);
+    successResponse(res, data, 200);
+  } catch (error: any) {
+    if (error.message === 'Invalid credentials') {
+      errorResponse(res, error.message, 401);
+    } else {
+      next(error);
     }
-
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      res.status(401).json({ success: false, error: 'Invalid credentials' });
-      return;
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      res.status(401).json({ success: false, error: 'Invalid credentials' });
-      return;
-    }
-
-    const token = generateToken(user.id);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        user: { id: user.id, email: user.email },
-        token,
-      },
-    });
-  } catch (error) {
-    next(error);
   }
 };
 
 export const getMe = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
+    // We keep getMe here or move to user.service, but it's simple enough:
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
       select: { id: true, email: true, createdAt: true },
     });
 
     if (!user) {
-      res.status(404).json({ success: false, error: 'User not found' });
+      errorResponse(res, 'User not found', 404);
       return;
     }
 
-    res.status(200).json({ success: true, data: user });
+    successResponse(res, user, 200);
   } catch (error) {
     next(error);
   }

@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { createMonitor, getMonitors, getMonitor, deleteMonitor } from '../controllers/monitor.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import { validateRequest } from '../middleware/validate.middleware.js';
+import { createMonitorSchema } from '../validators/monitor.validator.js';
 
 const router = Router();
 
 router.use(requireAuth); // Protect all routes below
 
-router.post('/', createMonitor);
+router.post('/', validateRequest(createMonitorSchema), createMonitor);
 router.get('/', getMonitors);
 router.get('/:id', getMonitor);
 router.delete('/:id', deleteMonitor);
