@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Get base URL from env or default to local backend port
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Get base URL from env or default dynamically to API prefix
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000/api');
 
 export const api = axios.create({
   baseURL: API_URL,

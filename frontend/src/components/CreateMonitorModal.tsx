@@ -51,7 +51,7 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
         </div>
         
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>}
+          {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4">{error}</div>}
           
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Target URL</label>

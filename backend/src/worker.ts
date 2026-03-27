@@ -7,7 +7,7 @@ interface MonitorWithProject {
   method: string;
   interval: number;
   status: string;
-  lastCheckedAt?: Date;
+  lastCheckedAt: Date | null;
   project: {
     user: {
       email: string;
@@ -37,6 +37,9 @@ const checkMonitors = async () => {
     }
   } catch (error) {
     console.error(`[Worker Error] Failed to fetch monitors:`, error);
+  } finally {
+    // Schedule the next tick recursively only AFTER the current one gracefully finishes
+    setTimeout(checkMonitors, CHECK_INTERVAL_MS);
   }
 };
 
@@ -106,8 +109,8 @@ const executeCheck = async (monitor: MonitorWithProject) => {
 };
 
 const startWorker = () => {
-  console.log('[Worker] Starting background monitor worker...');
-  setInterval(checkMonitors, CHECK_INTERVAL_MS);
+  console.log('[Worker] Starting background monitor worker with recursive timeouts...');
+  setTimeout(checkMonitors, CHECK_INTERVAL_MS);
 };
 
 startWorker();
