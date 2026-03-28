@@ -25,8 +25,8 @@ const PublicStatus: React.FC = () => {
       const { data } = await api.get('/public/status');
       return data.data as Monitor[];
     },
-    refetchInterval: 30000,
-    staleTime: 10000,
+    refetchInterval: 10000,
+    staleTime: 5000,
   });
 
   const monitors = monitorsResponse || [];

@@ -8,6 +8,10 @@
   --color-primary: #4a4a4a;
   --color-primary-dark: #2d2d2d;
   --color-accent: #7c7c7c;
+  /* ── Primary accent shades (blue) used by modal, status hub, etc. ── */
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
   --color-surface: #faf8f5;
   --color-surface-soft: #f5f2ed;
   --color-surface-card: #ffffff;

@@ -84,10 +84,10 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-lg glass-card p-0 overflow-hidden shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] border-white/20 dark:border-slate-700/50"
+            className="relative w-full max-w-lg glass-card p-0 overflow-hidden shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] border-stone-200 dark:border-slate-700/50"
           >
             {/* Header */}
-            <div className="p-6 border-b border-white/10 dark:border-slate-800/50 bg-white/5 flex justify-between items-center">
+            <div className="p-6 border-b border-stone-200 dark:border-slate-800/50 bg-stone-50 dark:bg-white/5 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary-500/20 rounded-xl" aria-hidden="true">
                   <Plus className="w-5 h-5 text-primary-500" />
@@ -99,7 +99,7 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
               <button
                 onClick={onClose}
                 aria-label="Close dialog"
-                className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-white/10 rounded-xl transition-all"
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
@@ -178,7 +178,7 @@ const CreateMonitorModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => 
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 px-6 py-4 glass rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border-none"
+                  className="flex-1 px-6 py-4 glass rounded-2xl text-xs font-black uppercase tracking-widest text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-white/10 transition-all border-none"
                 >
                   Discard
                 </button>

@@ -60,7 +60,7 @@ export class MonitorService {
         url,
         method,
         interval: Number(interval),
-        status: 'UP',
+        status: 'PENDING',
         failureCount: 0
       }
     });
