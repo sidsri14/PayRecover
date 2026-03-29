@@ -46,7 +46,7 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
               <ShieldAlert className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-stone-800 dark:text-stone-100">
-              API Pulse
+              RecoverPay
             </h1>
           </div>
 

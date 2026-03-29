@@ -9,75 +9,50 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String
-  createdAt DateTime  @default(now())
-  projects  Project[]
+  id             String          @id @default(uuid())
+  email          String          @unique
+  password       String
+  createdAt      DateTime        @default(now())
+  failedPayments FailedPayment[]
 }
 
-model Project {
-  id        String    @id @default(uuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String
-  createdAt DateTime  @default(now())
-  monitors  Monitor[]
+model FailedPayment {
+  id            String     @id @default(uuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentId     String     @unique
+  orderId       String?
+  amount        Int
+  currency      String     @default("INR")
+  customerEmail String
+  customerPhone String?
+  customerName  String?
+  status        String     @default("pending")
+  retryCount    Int        @default(0)
+  lastRetryAt   DateTime?
+  recoveredAt   DateTime?
+  paymentLink   String?
+  metadata      String?
+  createdAt     DateTime   @default(now())
+  reminders     Reminder[]
 }
 
-model Monitor {
-  id            String    @id @default(uuid())
-  projectId     String
-  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  name          String
-  url           String
-  method        String    @default("GET")
-  interval      Int       @default(60)
-  status        String    @default("PENDING")
-  failureCount  Int       @default(0)
-  lastCheckedAt DateTime?
-  logs          Log[]
-  alerts        Alert[]
-  incidents     Incident[]
-  maintenanceUntil DateTime?
-}
-
-model Log {
-  id           String   @id @default(uuid())
-  monitorId    String
-  monitor      Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
-  statusCode   Int?
-  responseTime Int?     
-  status       String   
-  createdAt    DateTime @default(now())
-}
-
-model Alert {
-  id        String   @id @default(uuid())
-  monitorId String
-  monitor   Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
-  type      String   @default("EMAIL")
-  sentAt    DateTime @default(now())
-  config    String?  
+model Reminder {
+  id              String        @id @default(uuid())
+  failedPaymentId String
+  failedPayment   FailedPayment @relation(fields: [failedPaymentId], references: [id], onDelete: Cascade)
+  type            String
+  dayOffset       Int
+  sentAt          DateTime      @default(now())
+  status          String        @default("sent")
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String
-  action    String
-  resource  String?
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  resource   String?
   resourceId String?
-  details   String?  
-  createdAt DateTime @default(now())
-}
-
-model Incident {
-  id           String    @id @default(uuid())
-  monitorId    String
-  monitor      Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
-  startedAt    DateTime  @default(now())
-  resolvedAt   DateTime?           
-  durationSecs Int?                
-  cause        String?             
-  status       String    @default("INVESTIGATING")
+  details    String?
+  createdAt  DateTime @default(now())
 }

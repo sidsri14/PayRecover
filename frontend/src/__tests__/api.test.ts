@@ -1,5 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import axios from 'axios';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

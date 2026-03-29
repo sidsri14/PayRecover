@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import MonitorDetails from './pages/MonitorDetails';
-import PublicStatus from './pages/PublicStatus';
-import { Moon, Sun, LogOut, ShieldAlert } from 'lucide-react';
+import PaymentDetails from './pages/PaymentDetails';
+import { Moon, Sun, LogOut, TrendingUp } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { api } from './api';
 
@@ -38,7 +37,6 @@ const ThemeToggle = () => {
   );
 };
 
-// Layout is defined OUTSIDE App so it is never needlessly re-created/re-mounted.
 type LayoutProps = {
   user: AuthUser;
   onLogout: () => void;
@@ -49,11 +47,11 @@ const Layout: React.FC<React.PropsWithChildren<LayoutProps>> = ({ children, user
     <header className="sticky top-0 z-50 p-4 border-b border-warm-border dark:border-stone-800 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md transition-all">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <div className="flex items-center gap-3 group cursor-pointer" onClick={() => window.location.href = '/'}>
-          <div className="bg-stone-700 dark:bg-stone-600 p-2.5 rounded-xl group-hover:bg-stone-600 dark:group-hover:bg-stone-500 transition-colors">
-            <ShieldAlert className="w-5 h-5 text-white" />
+          <div className="bg-emerald-600 dark:bg-emerald-700 p-2.5 rounded-xl group-hover:bg-emerald-500 dark:group-hover:bg-emerald-600 transition-colors">
+            <TrendingUp className="w-5 h-5 text-white" />
           </div>
           <span className="font-bold text-xl tracking-tight text-stone-800 dark:text-stone-100">
-            API Pulse
+            RecoverPay
           </span>
         </div>
 
@@ -85,7 +83,7 @@ const Layout: React.FC<React.PropsWithChildren<LayoutProps>> = ({ children, user
 
     <footer className="p-8 border-t border-warm-border dark:border-stone-800 text-center">
       <p className="text-xs font-medium text-stone-400 tracking-wide">
-        &copy; 2026 API Pulse
+        &copy; 2026 RecoverPay
       </p>
     </footer>
   </div>
@@ -113,15 +111,13 @@ function App() {
   }, []);
 
   const handleLogout = async () => {
-    const logoutId = toast.loading('Terminating session...');
+    const logoutId = toast.loading('Signing out...');
     try {
       await api.post('/auth/logout');
-      toast.success('Securely logged out', { id: logoutId });
+      toast.success('Signed out', { id: logoutId });
     } catch {
       toast.dismiss(logoutId);
     } finally {
-      // Setting user to null is enough — the Route guard below redirects to /login
-      // without a full page reload.
       setUser(null);
     }
   };
@@ -147,7 +143,6 @@ function App() {
         }}
       />
       <Routes>
-        <Route path="/status" element={<PublicStatus />} />
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login onLoginSuccess={setUser} />} />
         <Route path="/register" element={user ? <Navigate to="/" /> : <Register onRegisterSuccess={setUser} />} />
         <Route path="/*" element={
@@ -155,7 +150,7 @@ function App() {
             <Layout user={user} onLogout={handleLogout}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/monitors/:id" element={<MonitorDetails />} />
+                <Route path="/payments/:id" element={<PaymentDetails />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </Layout>
