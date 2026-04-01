@@ -142,7 +142,7 @@ const handlePaymentFailed = async (sourceId: string, userId: string, event: any)
 
   logger.info({ paymentId: payment.id }, 'Webhook processed successfully');
 
-  await AuditService.log(userId, 'PAYMENT_FAILED_RECEIVED', 'FailedPayment', payment.id, {
+  await AuditService.logAction(userId, 'PAYMENT_FAILED_RECEIVED', 'FailedPayment', payment.id, {
     amount: payment.amount,
     email: payment.email,
   });
@@ -163,8 +163,8 @@ const handlePaymentCaptured = async (userId: string, payment: any): Promise<void
   });
   if (!failed) return;
 
-  await PaymentService.markRecovered(failed.id);
-  await AuditService.log(userId, 'PAYMENT_RECOVERED', 'FailedPayment', failed.id, {
+  await PaymentService.markRecovered(failed.id, userId);
+  await AuditService.logAction(userId, 'PAYMENT_RECOVERED', 'FailedPayment', failed.id, {
     recoveredPaymentId: payment.id,
   });
 };
@@ -189,7 +189,7 @@ const handlePaymentRefunded = async (userId: string, refund: any): Promise<void>
       where: { id: failed.id },
       data: { status: 'abandoned', recoveredAt: null, recoveredVia: null },
     });
-    await AuditService.log(userId, 'PAYMENT_REFUNDED', 'FailedPayment', failed.id, {
+    await AuditService.logAction(userId, 'PAYMENT_REFUNDED', 'FailedPayment', failed.id, {
       refundId: refund.id,
       amount: refund.amount,
     });

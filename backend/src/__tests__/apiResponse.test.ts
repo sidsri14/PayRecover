@@ -1,21 +1,20 @@
-import { describe, test, expect, mock } from 'bun:test';
+import { describe, test, expect } from 'bun:test';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 
 // Minimal mock of Express Response
 function makeRes() {
-  const res: any = {};
   const captured: { status?: number; body?: any } = {};
-
-  res.status = mock((code: number) => {
-    captured.status = code;
-    return res;
-  });
-  res.json = mock((body: any) => {
-    captured.body = body;
-    return res;
-  });
-
-  res._captured = captured;
+  const res: any = {
+    status: (code: number) => {
+      captured.status = code;
+      return res;
+    },
+    json: (body: any) => {
+      captured.body = body;
+      return res;
+    },
+    _captured: captured
+  };
   return res;
 }
 

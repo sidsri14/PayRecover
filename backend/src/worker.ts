@@ -38,10 +38,10 @@ const processRecoveryQueue = async (): Promise<void> => {
           { OR: [{ retryCount: { gte: 3 } }, { createdAt: { lt: abandonThreshold } }] },
         ],
       } as any,
-      select: { id: true, paymentId: true },
+      select: { id: true, paymentId: true, userId: true },
     });
     for (const p of toAbandon) {
-      await PaymentService.markAbandoned(p.id);
+      await PaymentService.markAbandoned(p.id, p.userId);
       logger.info({ paymentId: p.paymentId }, 'Payment abandoned');
     }
     if (toAbandon.length > 0) {
@@ -131,7 +131,7 @@ const processRecoveryQueue = async (): Promise<void> => {
         // release advisory lock. Returns the new retryCount for accurate logging.
         const newRetryCount = await PaymentService.recordReminderAndIncrementRetry(payment.id, dayOffset, 'email');
 
-        await AuditService.log(
+        await AuditService.logAction(
           payment.userId,
           'PAYMENT_REMINDER_SENT',
           'FailedPayment',

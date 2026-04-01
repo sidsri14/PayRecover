@@ -40,7 +40,7 @@ export class AuthService {
       verifyLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${emailVerifyToken}`,
     }).catch(err => console.error('Failed to send verification email:', err));
 
-    await AuditService.log(user.id, 'USER_REGISTER', 'User', user.id, { email: user.email });
+    await AuditService.logAction(user.id, 'USER_REGISTER', 'User', user.id, { email: user.email });
 
     return { user: { id: user.id, email: user.email }, token };
   }
@@ -63,7 +63,7 @@ export class AuthService {
       data: { emailVerified: true, emailVerifyToken: null, emailVerifyExpiry: null },
     });
 
-    await AuditService.log(user.id, 'EMAIL_VERIFIED', 'User', user.id);
+    await AuditService.logAction(user.id, 'EMAIL_VERIFIED', 'User', user.id);
     return { message: 'Email verified successfully' };
   }
 
@@ -86,7 +86,7 @@ export class AuthService {
       expiresInMinutes: RESET_EXPIRY_MINUTES,
     }).catch(err => console.error('Failed to send reset email:', err));
 
-    await AuditService.log(user.id, 'PASSWORD_RESET_REQUESTED', 'User', user.id);
+    await AuditService.logAction(user.id, 'PASSWORD_RESET_REQUESTED', 'User', user.id);
     return { message: 'If that email exists, a reset link has been sent' };
   }
 
@@ -109,7 +109,7 @@ export class AuthService {
       data: { password: hashedPassword, passwordResetToken: null, passwordResetExpiry: null },
     });
 
-    await AuditService.log(user.id, 'PASSWORD_RESET_COMPLETED', 'User', user.id);
+    await AuditService.logAction(user.id, 'PASSWORD_RESET_COMPLETED', 'User', user.id);
     return { message: 'Password reset successfully' };
   }
 
@@ -128,7 +128,7 @@ export class AuthService {
 
     const token = generateToken(user.id);
 
-    await AuditService.log(user.id, 'USER_LOGIN', 'User', user.id);
+    await AuditService.logAction(user.id, 'USER_LOGIN', 'User', user.id);
 
     return { user: { id: user.id, email: user.email }, token };
   }

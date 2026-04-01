@@ -18,6 +18,59 @@ const ZERO = {
 };
 
 export class PaymentService {
+  static async getPayments(userId: string, options: { status?: string; search?: string; page?: number; limit?: number } = {}) {
+    const { status, search, page = 1, limit = 50 } = options;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.FailedPaymentWhereInput = { userId };
+    if (status) where.status = status;
+    if (search) {
+      where.OR = [
+        { customerEmail: { contains: search } },
+        { paymentId: { contains: search } },
+        { customerName: { contains: search } },
+      ];
+    }
+
+    const [payments, total] = await Promise.all([
+      prisma.failedPayment.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: { recoveryLinks: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      }),
+      prisma.failedPayment.count({ where }),
+    ]);
+
+    return {
+      payments,
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+    };
+  }
+
+  static async getPaymentById(userId: string, id: string) {
+    const payment = await prisma.failedPayment.findFirst({
+      where: { id, userId },
+      include: {
+        recoveryLinks: { orderBy: { createdAt: 'desc' } },
+        reminders: { orderBy: { sentAt: 'desc' } },
+        event: true,
+      },
+    });
+
+    if (!payment) {
+      const err = new Error('Payment not found') as any;
+      err.status = 404;
+      throw err;
+    }
+
+    return payment;
+  }
+
   /**
    * Syncs a payment from Razorpay's webhook into our FailedPayment tracking system.
    * Ensures idempotency via the Razorpay payment ID.
@@ -51,22 +104,22 @@ export class PaymentService {
     });
   }
 
-  static async markRecovered(failedPaymentId: string, via: 'link' | 'external' = 'link') {
+  static async markRecovered(failedPaymentId: string, userId: string, via: 'link' | 'external' = 'link') {
     await prisma.failedPayment.update({
       where: { id: failedPaymentId },
       data: { status: 'recovered', recoveredAt: new Date(), recoveredVia: via },
     });
     
     // Log the success audit trail
-    await AuditService.logAction('PAYMENT_RECOVERED', failedPaymentId, { via });
+    await AuditService.logAction(userId, 'PAYMENT_RECOVERED', 'FailedPayment', failedPaymentId, { via });
   }
 
-  static async markAbandoned(failedPaymentId: string) {
+  static async markAbandoned(failedPaymentId: string, userId: string) {
     await prisma.failedPayment.update({
       where: { id: failedPaymentId },
       data: { status: 'abandoned' },
     });
-    await AuditService.logAction('PAYMENT_ABANDONED', failedPaymentId);
+    await AuditService.logAction(userId, 'PAYMENT_ABANDONED', 'FailedPayment', failedPaymentId);
   }
 
   static async getPendingForRetry(): Promise<FailedPaymentWithLinks[]> {
@@ -174,6 +227,24 @@ export class PaymentService {
       where: { id: failedPaymentId },
       data: { nextRetryAt: new Date() },
     });
+  }
+
+  static async getDashboardStats(userId: string) {
+    const metrics = await PaymentService.getMetrics(userId);
+    const countsAgg = await prisma.failedPayment.groupBy({
+      by: ['status'],
+      where: { userId },
+      _count: true,
+    });
+    
+    const counts = { pending: 0, retrying: 0, recovered: 0, abandoned: 0 };
+    countsAgg.forEach(c => {
+      if (c.status in counts) {
+        (counts as any)[c.status] = c._count;
+      }
+    });
+
+    return { metrics, counts };
   }
 
   static async getMetrics(userId: string) {

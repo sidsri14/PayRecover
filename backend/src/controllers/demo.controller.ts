@@ -2,6 +2,7 @@ import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
 import { prisma } from '../utils/prisma.js';
 import { successResponse } from '../utils/apiResponse.js';
+import { AuditService } from '../services/audit.service.js';
 
 export const simulateFailure = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -25,7 +26,7 @@ export const simulateFailure = async (req: AuthRequest, res: Response, next: Nex
         nextRetryAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
-
+    await AuditService.logAction(req.userId!, 'DEMO_FAILURE_SIMULATED', 'FailedPayment', payment.id);
     successResponse(res, { 
       message: 'Demo failed payment created successfully',
       payment 

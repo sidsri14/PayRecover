@@ -19,7 +19,7 @@ export const updatePlan = async (req: AuthRequest, res: Response, next: NextFunc
       select: { id: true, email: true, plan: true },
     });
 
-    await AuditService.logAction('PLAN_UPDATED', user.id, { plan }, req.userId!);
+    await AuditService.logAction(req.userId!, 'PLAN_UPDATED', 'User', user.id, { plan });
     
     successResponse(res, { 
       message: `Account successfully updated to ${plan} plan`,

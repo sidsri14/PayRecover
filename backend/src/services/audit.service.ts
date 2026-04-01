@@ -4,14 +4,20 @@ export class AuditService {
   /**
    * Logs an action to the persistent audit trail.
    */
-  static async logAction(action: string, resourceId: string | null = null, details: any = null, userId: string = 'system') {
+  static async logAction(
+    userId: string,
+    action: string,
+    resource: string | null = null,
+    resourceId: string | null = null,
+    details: any = null
+  ) {
     try {
       await prisma.auditLog.create({
         data: {
           userId,
           action,
+          resource,
           resourceId,
-          resource: 'FailedPayment', // predominantly used for failed payments
           details: details ? JSON.stringify(details) : null,
         },
       });

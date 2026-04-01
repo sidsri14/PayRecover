@@ -17,7 +17,8 @@ export const connectSource = async (req: AuthRequest, res: Response, next: NextF
   try {
     const parsed = connectSchema.safeParse(req.body);
     if (!parsed.success) {
-      errorResponse(res, 'Invalid request body: ' + parsed.error.issues[0].message, 400);
+      const message = parsed.error.issues[0]?.message ?? 'Validation failed';
+      errorResponse(res, 'Invalid request body: ' + message, 400);
       return;
     }
 
@@ -33,7 +34,7 @@ export const connectSource = async (req: AuthRequest, res: Response, next: NextF
     }
 
     const source = await SourceService.createSource(req.userId!, parsed.data);
-    await AuditService.logAction('SOURCE_CREATED', source.id, { name: source.name }, req.userId!);
+    await AuditService.logAction(req.userId!, 'SOURCE_CREATED', 'PaymentSource', source.id, { name: source.name });
     successResponse(res, source, 201);
   } catch (error: any) {
     next(error);
@@ -72,7 +73,7 @@ export const deleteSource = async (req: AuthRequest, res: Response, next: NextFu
   try {
     const sourceId = req.params['id'] as string;
     await SourceService.deleteSource(req.userId!, sourceId);
-    await AuditService.logAction('SOURCE_DELETED', sourceId, null, req.userId!);
+    await AuditService.logAction(req.userId!, 'SOURCE_DELETED', 'PaymentSource', sourceId);
     successResponse(res, { deleted: true });
   } catch (error: any) {
     next(error);
