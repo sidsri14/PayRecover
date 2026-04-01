@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 
-import { Moon, Sun, LogOut, TrendingUp, Link2, Loader2 } from 'lucide-react';
+import { Moon, Sun, LogOut, TrendingUp, Link2, Loader2, Settings as SettingsIcon } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { api } from './api';
 
@@ -10,6 +10,7 @@ const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const PaymentDetails = lazy(() => import('./pages/PaymentDetails'));
 const Sources = lazy(() => import('./pages/Sources'));
+const Settings = lazy(() => import('./pages/Settings'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
@@ -75,6 +76,13 @@ const Layout: React.FC<React.PropsWithChildren<LayoutProps>> = ({ children, user
             className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-all text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 font-medium text-sm border border-transparent hover:border-warm-border dark:hover:border-stone-700"
           >
             <Link2 className="w-4 h-4" /> Sources
+          </button>
+
+          <button
+            onClick={() => navigate('/settings')}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-all text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 font-medium text-sm border border-transparent hover:border-warm-border dark:hover:border-stone-700"
+          >
+            <SettingsIcon className="w-4 h-4" /> Settings
           </button>
 
           <div className="hidden sm:flex flex-col items-end">
@@ -146,6 +154,7 @@ function PageTitle() {
       '/login': 'Sign In | PayRecover',
       '/register': 'Create Account | PayRecover',
       '/sources': 'Payment Sources | PayRecover',
+      '/settings': 'Settings | PayRecover',
       '/forgot-password': 'Reset Password | PayRecover',
       '/reset-password': 'New Password | PayRecover',
       '/verify-email': 'Verify Account | PayRecover',
@@ -225,6 +234,7 @@ function App() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/payments/:id" element={<PaymentDetails />} />
                     <Route path="/sources" element={<Sources />} />
+                    <Route path="/settings" element={<Settings user={user} onUpdateUser={(u) => setUser(u)} />} />
                     <Route path="*" element={<Navigate to="/" />} />
                   </Routes>
                 </Layout>

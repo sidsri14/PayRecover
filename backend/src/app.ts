@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -7,6 +8,8 @@ import { rateLimit } from 'express-rate-limit';
 import authRoutes from './routes/auth.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
+import billingRoutes from './routes/billing.routes.js';
+import demoRoutes from './routes/demo.routes.js';
 import { prisma } from './utils/prisma.js';
 
 const app = express();
@@ -55,6 +58,8 @@ app.get('/health', async (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/demo', demoRoutes);
 
 // Error Handling
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

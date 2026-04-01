@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Zap, Copy, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, Zap, Copy, ExternalLink, Loader2, CheckCircle2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../api';
@@ -31,6 +31,20 @@ const ConnectForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     },
     onError: () => toast.error('Failed to connect account'),
   });
+
+  const testMutation = useMutation({
+    mutationFn: (data: { keyId: string; keySecret: string }) => api.post('/sources/test', data),
+    onSuccess: () => toast.success('Connection verified successfully!'),
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Verification failed'),
+  });
+
+  const handleTest = () => {
+    if (!form.keyId || !form.keySecret) {
+      toast.error('Key ID and Secret are required to test');
+      return;
+    }
+    testMutation.mutate({ keyId: form.keyId, keySecret: form.keySecret });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,6 +127,15 @@ const ConnectForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-sm transition-colors disabled:opacity-50"
           >
             {mutation.isPending ? 'Connecting...' : 'Connect Account'}
+          </button>
+          <button
+            type="button"
+            onClick={handleTest}
+            disabled={testMutation.isPending}
+            className="px-5 py-2.5 border border-emerald-600 dark:border-emerald-500 text-emerald-600 dark:text-emerald-400 font-semibold rounded-lg text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {testMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            Test Connection
           </button>
           <button
             type="button"

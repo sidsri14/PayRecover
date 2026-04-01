@@ -64,7 +64,7 @@ export function useDashboardData() {
 
   // ── Mutations
   const upgradeMutation = useMutation({
-    mutationFn: () => api.post('/billing/upgrade'),
+    mutationFn: () => api.patch('/billing/plan', { plan: 'paid' }),
     onSuccess: () => {
       toast.success('Pro plan activated!');
       setShowUpgradeModal(false);

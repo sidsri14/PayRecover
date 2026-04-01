@@ -6,7 +6,7 @@ import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import { z } from 'zod';
 
 const connectSchema = z.object({
-  // Razorpay key IDs are always rzp_test_... or rzp_live_... followed by 14+ alphanumeric chars
+  // Razorpay key IDs are always rzp_test_... or rzp_live_...
   keyId: z.string().regex(/^rzp_(test|live)_[a-zA-Z0-9]{14,}$/, 'Invalid Razorpay Key ID format'),
   keySecret: z.string().min(20).max(100),
   webhookSecret: z.string().min(20).max(256),
@@ -17,11 +17,43 @@ export const connectSource = async (req: AuthRequest, res: Response, next: NextF
   try {
     const parsed = connectSchema.safeParse(req.body);
     if (!parsed.success) {
-      errorResponse(res, 'Invalid request body', 400);
+      errorResponse(res, 'Invalid request body: ' + parsed.error.issues[0].message, 400);
       return;
     }
+
+    // Auto-validate credentials against Razorpay before saving
+    const isValid = await SourceService.validateCredentials({
+      keyId: parsed.data.keyId,
+      keySecret: parsed.data.keySecret,
+    });
+
+    if (!isValid) {
+      errorResponse(res, 'Could not verify Razorpay credentials. Please check your Key ID and Secret.', 401);
+      return;
+    }
+
     const source = await SourceService.createSource(req.userId!, parsed.data);
+    await AuditService.logAction('SOURCE_CREATED', source.id, { name: source.name }, req.userId!);
     successResponse(res, source, 201);
+  } catch (error: any) {
+    next(error);
+  }
+};
+
+export const testConnection = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { keyId, keySecret } = req.body;
+    if (!keyId || !keySecret) {
+      errorResponse(res, 'Key ID and Secret are required', 400);
+      return;
+    }
+
+    const isValid = await SourceService.validateCredentials({ keyId, keySecret });
+    if (isValid) {
+      successResponse(res, { message: 'Connection verified successfully!' });
+    } else {
+      errorResponse(res, 'Verification failed. Credentials might be invalid.', 401);
+    }
   } catch (error: any) {
     next(error);
   }
@@ -40,7 +72,7 @@ export const deleteSource = async (req: AuthRequest, res: Response, next: NextFu
   try {
     const sourceId = req.params['id'] as string;
     await SourceService.deleteSource(req.userId!, sourceId);
-    await AuditService.log(req.userId!, 'SOURCE_DELETED', 'PaymentSource', sourceId);
+    await AuditService.logAction('SOURCE_DELETED', sourceId, null, req.userId!);
     successResponse(res, { deleted: true });
   } catch (error: any) {
     next(error);

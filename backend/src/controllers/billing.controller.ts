@@ -1,31 +1,31 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
 import { prisma } from '../utils/prisma.js';
-import { successResponse } from '../utils/apiResponse.js';
+import { successResponse, errorResponse } from '../utils/apiResponse.js';
+import { AuditService } from '../services/audit.service.js';
 
-export const getBillingStatus = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const updatePlan = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId! },
-      select: { plan: true },
-    });
-    successResponse(res, { plan: user?.plan ?? 'free' });
-  } catch (error: any) {
-    next(error);
-  }
-};
+    const { plan } = req.body;
+    
+    if (!['free', 'paid'].includes(plan)) {
+      errorResponse(res, 'Invalid plan type', 400);
+      return;
+    }
 
-// In production this would go through Stripe/Razorpay Subscriptions first.
-// For now it directly upgrades the plan after payment confirmation would occur.
-export const upgradeToPaid = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-  try {
     const user = await prisma.user.update({
-      where: { id: req.userId! },
-      data: { plan: 'paid' },
+      where: { id: req.userId },
+      data: { plan },
       select: { id: true, email: true, plan: true },
     });
-    successResponse(res, { plan: user.plan });
-  } catch (error: any) {
+
+    await AuditService.logAction('PLAN_UPDATED', user.id, { plan }, req.userId!);
+    
+    successResponse(res, { 
+      message: `Account successfully updated to ${plan} plan`,
+      user 
+    });
+  } catch (error) {
     next(error);
   }
 };

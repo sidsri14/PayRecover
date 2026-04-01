@@ -59,4 +59,15 @@ export class RazorpayService {
     } as any);
     return (response as any).short_url as string;
   }
+  static async validateCredentials(keyId: string, keySecret: string): Promise<boolean> {
+    try {
+      const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+      // Minimal read-only call to verify connectivity
+      await razorpay.payments.all({ count: 1 });
+      return true;
+    } catch (error: any) {
+      console.error('[Razorpay Validation Failed]', error.message);
+      return false;
+    }
+  }
 }

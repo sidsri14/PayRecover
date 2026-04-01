@@ -1,5 +1,6 @@
 import { prisma } from '../utils/prisma.js';
 import { encrypt, decrypt } from '../utils/crypto.utils.js';
+import { RazorpayService } from './razorpay.service.js';
 
 export class SourceService {
   /** Returns the canonical webhook URL for a source, derived from server config.
@@ -81,5 +82,8 @@ export class SourceService {
       keySecret: decrypt(source.keySecret),
       webhookSecret: decrypt(source.webhookSecret),
     };
+  }
+  static async validateCredentials(data: { keyId: string; keySecret: string }): Promise<boolean> {
+    return RazorpayService.validateCredentials(data.keyId, data.keySecret);
   }
 }

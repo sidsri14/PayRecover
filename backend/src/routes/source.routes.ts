@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { connectSource, getSources, deleteSource } from '../controllers/source.controller.js';
+import { connectSource, getSources, deleteSource, testConnection } from '../controllers/source.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { rateLimit } from 'express-rate-limit';
 
