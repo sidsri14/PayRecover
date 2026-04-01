@@ -67,7 +67,7 @@ const Register: React.FC<Props> = ({ onRegisterSuccess }) => {
               <ShieldPlus className="w-9 h-9 text-white" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-stone-800 dark:text-stone-100">
-              RecoverPay
+              PayRecover
             </h1>
           </div>
 

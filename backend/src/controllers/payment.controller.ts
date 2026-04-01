@@ -1,35 +1,35 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
-import { PaymentService } from '../services/payment.service.js';
+import { getPaymentsList, getPaymentDetails, triggerManualRetry } from '../services/payment.service.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
+import { enqueueRecoveryJob } from '../jobs/recovery.queue.js';
 
-export const getPayments = async (req: AuthRequest, res: Response, _next: NextFunction): Promise<void> => {
+export const getPayments = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
-    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-    const page = typeof req.query.page === 'string' ? Math.max(1, parseInt(req.query.page, 10)) : 1;
-    const limit = typeof req.query.limit === 'string' ? Math.min(100, Math.max(1, parseInt(req.query.limit, 10))) : 50;
-    const result = await PaymentService.getPayments(req.userId!, { status, search, page, limit });
+    const { status, search, page, limit } = req.query;
+    const result = await getPaymentsList(req.userId!, {
+      status: status ? String(status) : undefined,
+      search: search ? String(search) : undefined,
+      page: page ? Math.max(1, Number(page)) : 1,
+      limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
+    });
     successResponse(res, result);
-  } catch (error: any) {
-    errorResponse(res, error.message, error.status || 500);
-  }
+  } catch (err) { next(err); }
 };
 
-export const getPayment = async (req: AuthRequest, res: Response, _next: NextFunction): Promise<void> => {
+export const getPayment = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const payment = await PaymentService.getPaymentById(req.userId!, req.params['id'] as string);
-    successResponse(res, payment);
-  } catch (error: any) {
-    errorResponse(res, error.message, error.status || 404);
-  }
+    const p = await getPaymentDetails(req.userId!, String(req.params.id || ''));
+    successResponse(res, p);
+  } catch (err) { next(err); }
 };
 
-export const triggerManualRetry = async (req: AuthRequest, res: Response, _next: NextFunction): Promise<void> => {
+export const manualRetry = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    await PaymentService.triggerManualRetry(req.userId!, req.params['id'] as string);
-    successResponse(res, { message: 'Retry queued — worker will process on next tick' });
-  } catch (error: any) {
-    errorResponse(res, error.message, error.status || 400);
-  }
+    const id = String(req.params.id || '');
+    if (!id) return errorResponse(res, 'ID required', 400);
+    await triggerManualRetry(req.userId!, id);
+    void enqueueRecoveryJob(id).catch(() => {}); // immediate job; fire-and-forget
+    successResponse(res, { message: 'Retry queued' });
+  } catch (err) { next(err); }
 };

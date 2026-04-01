@@ -1,164 +1,88 @@
 import 'dotenv/config';
 import pino from 'pino';
+import IORedis from 'ioredis';
+import { Worker } from 'bullmq';
 import { prisma } from './utils/prisma.js';
-import { PaymentService } from './services/payment.service.js';
-import { RazorpayService } from './services/razorpay.service.js';
-import { SourceService } from './services/source.service.js';
-import { sendPaymentFailedEmail, sendPaymentReminderEmail } from './services/email.service.js';
-import { AuditService } from './services/audit.service.js';
+import { processRecoveryJob } from './jobs/recovery.processor.js';
 
-const RECOVERY_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const ABANDON_AFTER_DAYS = 7;
+const ABANDON_INTERVAL_MS = 60 * 60 * 1000; // check every hour
 
-const logger = pino({
-  transport: { target: 'pino-pretty', options: { colorize: true } },
+const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
+
+// Separate Redis connection for the Worker (BullMQ requires its own connection).
+const workerConnection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
 });
 
-let isShuttingDown = false;
-let recoveryHandle: ReturnType<typeof setTimeout> | null = null;
+// ── BullMQ Worker ─────────────────────────────────────────────────────────────
 
-const processRecoveryQueue = async (): Promise<void> => {
-  if (isShuttingDown) return;
+const recoveryWorker = new Worker(
+  'payment-recovery',
+  processRecoveryJob,
+  {
+    connection: workerConnection,
+    concurrency: 5, // process up to 5 payments in parallel
+  }
+);
 
-  logger.info('Recovery worker tick started');
+recoveryWorker.on('completed', (job) => {
+  logger.info({ jobId: job.id, paymentId: job.data.failedPaymentId }, 'Recovery job completed');
+});
 
+recoveryWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, paymentId: job?.data?.failedPaymentId, err }, 'Recovery job failed');
+});
+
+// ── Hourly abandon cleanup ────────────────────────────────────────────────────
+// Runs on a simple interval — abandonment doesn't need BullMQ's reliability guarantees.
+
+let abandonHandle: ReturnType<typeof setTimeout> | null = null;
+
+const runAbandonCleanup = async (): Promise<void> => {
   try {
-    // 1. Mark payments as abandoned when they have exhausted all retries or are too old.
-    //    Exclude payments currently held by an advisory lock (being processed right now)
-    //    to avoid abandoning a payment mid-flight.
-    const abandonThreshold = new Date(Date.now() - ABANDON_AFTER_DAYS * 24 * 60 * 60 * 1000);
-    const lockExpiry = new Date(Date.now() - 30 * 60 * 1000);
+    const abandonThreshold = new Date(Date.now() - ABANDON_AFTER_DAYS * 86_400_000);
+    const lockExpiry = new Date(Date.now() - 30 * 60_000);
+
     const toAbandon = await prisma.failedPayment.findMany({
       where: {
         status: { in: ['pending', 'retrying'] },
         AND: [
-          // Only abandon if not currently locked (or lock is stale > 30 min)
           { OR: [{ lockedAt: null }, { lockedAt: { lt: lockExpiry } }] },
-          // Only abandon if exhausted retries OR too old
           { OR: [{ retryCount: { gte: 3 } }, { createdAt: { lt: abandonThreshold } }] },
         ],
-      } as any,
-      select: { id: true, paymentId: true, userId: true },
+      },
+      select: { id: true, userId: true, paymentId: true },
     });
-    for (const p of toAbandon) {
-      await PaymentService.markAbandoned(p.id, p.userId);
-      logger.info({ paymentId: p.paymentId }, 'Payment abandoned');
+
+    if (toAbandon.length) {
+      const ids = toAbandon.map(p => p.id);
+      await prisma.failedPayment.updateMany({ where: { id: { in: ids } }, data: { status: 'abandoned' } });
+      await prisma.auditLog.createMany({
+        data: toAbandon.map(p => ({
+          userId: p.userId,
+          action: 'PAYMENT_ABANDONED',
+          resource: 'FailedPayment',
+          resourceId: p.id,
+        })),
+      });
+      logger.info(`Abandoned ${toAbandon.length} payment(s)`);
     }
-    if (toAbandon.length > 0) {
-      logger.info(`Marked ${toAbandon.length} payment(s) as abandoned`);
-    }
-
-    // 2. Process retry queue (pending + retrying with retryCount < 3)
-    const pending = await PaymentService.getPendingForRetry();
-    logger.info(`${pending.length} payment(s) ready for retry`);
-
-    for (const payment of pending) {
-      try {
-        // Race condition guard: re-check status before processing.
-        // The payment could have been recovered by a webhook between our query and now.
-        const fresh = await prisma.failedPayment.findUnique({
-          where: { id: payment.id },
-          select: { status: true },
-        });
-        if (!fresh || !['pending', 'retrying'].includes(fresh.status)) {
-          logger.info({ paymentId: payment.paymentId }, 'Payment already processed, skipping');
-          continue;
-        }
-
-        // Get source credentials (decrypted) for this payment
-        let keyId = process.env.RAZORPAY_KEY_ID!;
-        let keySecret = process.env.RAZORPAY_KEY_SECRET!;
-
-        if (payment.eventId) {
-          const event = await prisma.paymentEvent.findUnique({
-            where: { id: payment.eventId },
-            select: { sourceId: true },
-          });
-          if (event?.sourceId) {
-            const source = await SourceService.getSourceWithSecrets(event.sourceId);
-            if (source) {
-              keyId = source.keyId;
-              keySecret = source.keySecret; // already decrypted by getSourceWithSecrets
-            }
-          }
-        }
-
-        // Use existing recovery link if available, otherwise create one.
-        const links = payment.recoveryLinks;
-        let paymentLink: string | undefined = links[0]?.url;
-        if (!paymentLink) {
-          paymentLink = await RazorpayService.createPaymentLink(keyId, keySecret, {
-            amount: payment.amount,
-            currency: payment.currency,
-            customerName: payment.customerName ?? undefined,
-            customerEmail: payment.customerEmail,
-            customerPhone: payment.customerPhone ?? undefined,
-            description: `Retry payment${payment.orderId ? ` for order ${payment.orderId}` : ''}`,
-            referenceId: payment.id,
-          });
-          await PaymentService.createRecoveryLink(payment.id, paymentLink);
-        }
-
-        // Guard: if link creation failed above this line, the outer catch handles it.
-        // This explicit check prevents passing undefined to the email service.
-        if (!paymentLink) {
-          throw new Error(`No payment link available for payment ${payment.id}`);
-        }
-
-        const dayOffset = payment.retryCount === 0 ? 0 : payment.retryCount === 1 ? 1 : 3;
-
-        // 3. AWAIT: email must be sent BEFORE we update counts to ensure reliability
-        if (payment.retryCount === 0) {
-          await sendPaymentFailedEmail(payment.customerEmail, {
-            customerName: payment.customerName ?? undefined,
-            amount: payment.amount,
-            currency: payment.currency,
-            paymentLink,
-            paymentId: payment.paymentId,
-          });
-        } else {
-          await sendPaymentReminderEmail(payment.customerEmail, {
-            customerName: payment.customerName ?? undefined,
-            amount: payment.amount,
-            currency: payment.currency,
-            paymentLink,
-            dayOffset,
-            paymentId: payment.paymentId,
-          });
-        }
-
-        // Single atomic transaction: log reminder, increment retryCount, set nextRetryAt,
-        // release advisory lock. Returns the new retryCount for accurate logging.
-        const newRetryCount = await PaymentService.recordReminderAndIncrementRetry(payment.id, dayOffset, 'email');
-
-        await AuditService.logAction(
-          payment.userId,
-          'PAYMENT_REMINDER_SENT',
-          'FailedPayment',
-          payment.id,
-          { retryCount: newRetryCount, dayOffset, email: payment.customerEmail }
-        );
-
-        logger.info({ paymentId: payment.paymentId, retryCount: newRetryCount }, 'Reminder sent');
-      } catch (err) {
-        logger.error({ paymentId: payment.paymentId, err }, 'Failed to process payment retry');
-        // Release lock on error so another worker can try later
-        await PaymentService.releaseLock(payment.id).catch(() => {});
-      }
-    }
-  } catch (error) {
-    logger.error(error, 'Recovery queue processing error');
+  } catch (err) {
+    logger.error(err, 'Abandon cleanup error');
   } finally {
-    if (!isShuttingDown) {
-      recoveryHandle = setTimeout(processRecoveryQueue, RECOVERY_INTERVAL_MS);
-    }
+    abandonHandle = setTimeout(runAbandonCleanup, ABANDON_INTERVAL_MS);
   }
 };
 
+// ── Shutdown ──────────────────────────────────────────────────────────────────
+
 const shutdown = async (signal: string): Promise<void> => {
   logger.info(`Shutting down worker (${signal})`);
-  isShuttingDown = true;
-  if (recoveryHandle) clearTimeout(recoveryHandle);
+  if (abandonHandle) clearTimeout(abandonHandle);
+  await recoveryWorker.close();
+  workerConnection.disconnect();
   await prisma.$disconnect();
   process.exit(0);
 };
@@ -166,5 +90,7 @@ const shutdown = async (signal: string): Promise<void> => {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-logger.info('PayRecover Worker v2.0 — started');
-processRecoveryQueue();
+// ── Start ─────────────────────────────────────────────────────────────────────
+
+logger.info('PayRecover Worker — started (BullMQ + Redis)');
+runAbandonCleanup();

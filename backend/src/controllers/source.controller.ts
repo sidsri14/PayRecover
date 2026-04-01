@@ -1,81 +1,54 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
-import { SourceService } from '../services/source.service.js';
-import { AuditService } from '../services/audit.service.js';
+import { createPaymentSource, getPaymentSources, deletePaymentSource, validateSourceCredentials } from '../services/source.service.js';
+import { logAuditAction } from '../services/audit.service.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import { z } from 'zod';
 
 const connectSchema = z.object({
-  // Razorpay key IDs are always rzp_test_... or rzp_live_...
-  keyId: z.string().regex(/^rzp_(test|live)_[a-zA-Z0-9]{14,}$/, 'Invalid Razorpay Key ID format'),
+  keyId: z.string().regex(/^rzp_(test|live)_[a-zA-Z0-9]{14,}$/, 'Invalid Razorpay Key ID'),
   keySecret: z.string().min(20).max(100),
   webhookSecret: z.string().min(20).max(256),
   name: z.string().max(100).optional(),
 });
 
-export const connectSource = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const connectSource = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const parsed = connectSchema.safeParse(req.body);
-    if (!parsed.success) {
-      const message = parsed.error.issues[0]?.message ?? 'Validation failed';
-      errorResponse(res, 'Invalid request body: ' + message, 400);
-      return;
+    if (!parsed.success) return errorResponse(res, 'Invalid request body', 400);
+
+    if (!(await validateSourceCredentials(parsed.data.keyId, parsed.data.keySecret))) {
+      return errorResponse(res, 'Invalid Razorpay credentials', 401);
     }
 
-    // Auto-validate credentials against Razorpay before saving
-    const isValid = await SourceService.validateCredentials({
-      keyId: parsed.data.keyId,
-      keySecret: parsed.data.keySecret,
-    });
-
-    if (!isValid) {
-      errorResponse(res, 'Could not verify Razorpay credentials. Please check your Key ID and Secret.', 401);
-      return;
-    }
-
-    const source = await SourceService.createSource(req.userId!, parsed.data);
-    await AuditService.logAction(req.userId!, 'SOURCE_CREATED', 'PaymentSource', source.id, { name: source.name });
+    const source = await createPaymentSource(req.userId!, parsed.data);
+    await logAuditAction(req.userId!, 'SOURCE_CREATED', 'PaymentSource', source.id, { name: source.name });
     successResponse(res, source, 201);
-  } catch (error: any) {
-    next(error);
-  }
+  } catch (err) { next(err); }
 };
 
-export const testConnection = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const testConnection = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { keyId, keySecret } = req.body;
-    if (!keyId || !keySecret) {
-      errorResponse(res, 'Key ID and Secret are required', 400);
-      return;
-    }
+    if (typeof keyId !== 'string' || typeof keySecret !== 'string') return errorResponse(res, 'Key ID and Secret required', 400);
 
-    const isValid = await SourceService.validateCredentials({ keyId, keySecret });
-    if (isValid) {
-      successResponse(res, { message: 'Connection verified successfully!' });
-    } else {
-      errorResponse(res, 'Verification failed. Credentials might be invalid.', 401);
-    }
-  } catch (error: any) {
-    next(error);
-  }
+    const ok = await validateSourceCredentials(keyId, keySecret);
+    successResponse(res, { message: ok ? 'Verified!' : 'Failed' }, ok ? 200 : 401);
+  } catch (err) { next(err); }
 };
 
-export const getSources = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const getSources = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const sources = await SourceService.getSources(req.userId!);
-    successResponse(res, sources);
-  } catch (error: any) {
-    next(error);
-  }
+    successResponse(res, await getPaymentSources(req.userId!));
+  } catch (err) { next(err); }
 };
 
-export const deleteSource = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const deleteSource = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const sourceId = req.params['id'] as string;
-    await SourceService.deleteSource(req.userId!, sourceId);
-    await AuditService.logAction(req.userId!, 'SOURCE_DELETED', 'PaymentSource', sourceId);
+    const id = String(req.params.id || '');
+    if (!id) return errorResponse(res, 'ID required', 400);
+    await deletePaymentSource(req.userId!, id);
+    await logAuditAction(req.userId!, 'SOURCE_DELETED', 'PaymentSource', id);
     successResponse(res, { deleted: true });
-  } catch (error: any) {
-    next(error);
-  }
+  } catch (err) { next(err); }
 };

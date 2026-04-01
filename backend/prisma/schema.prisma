@@ -1,10 +1,11 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "windows"]
+  provider = "prisma-client-js"
+  // Add "linux-musl-openssl-3.0.x" if deploying to Alpine Linux (Railway, Render, etc.)
+  binaryTargets = ["native"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -95,6 +96,7 @@ model RecoveryLink {
   failedPaymentId String
   failedPayment   FailedPayment @relation(fields: [failedPaymentId], references: [id], onDelete: Cascade)
   url             String
+  expiresAt       DateTime?     // Expiration metadata for the recovery link
   createdAt       DateTime      @default(now())
 
   @@index([failedPaymentId])

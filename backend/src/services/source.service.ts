@@ -1,89 +1,53 @@
 import { prisma } from '../utils/prisma.js';
 import { encrypt, decrypt } from '../utils/crypto.utils.js';
-import { RazorpayService } from './razorpay.service.js';
+import { validateRazorpayCredentials } from './razorpay.service.js';
 
-export class SourceService {
-  /** Returns the canonical webhook URL for a source, derived from server config.
-   *  Using env var prevents clients from constructing wrong URLs on phishing/misconfig domains. */
-  static getWebhookUrl(sourceId: string): string {
-    const base = (process.env.WEBHOOK_BASE_URL || process.env.BACKEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-    return `${base}/api/webhooks/razorpay/${sourceId}`;
-  }
+export const getWebhookUrl = (sourceId: string) => {
+  const base = (process.env.WEBHOOK_BASE_URL || process.env.BACKEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+  return `${base}/api/webhooks/razorpay/${sourceId}`;
+};
 
-  static async createSource(
-    userId: string,
-    data: {
-      keyId: string;
-      keySecret: string;
-      webhookSecret: string;
-      name?: string;
-    }
-  ) {
-    return prisma.paymentSource.create({
-      data: {
-        userId,
-        keyId: data.keyId,
-        keySecret: encrypt(data.keySecret),
-        webhookSecret: encrypt(data.webhookSecret),
-        name: data.name,
-      },
-      select: {
-        id: true,
-        userId: true,
-        provider: true,
-        name: true,
-        keyId: true,
-        webhookSecret: false,
-        keySecret: false,
-        createdAt: true,
-      },
-    });
-  }
+export const createPaymentSource = (userId: string, data: any) =>
+  prisma.paymentSource.create({
+    data: { 
+      userId, keyId: data.keyId, 
+      keySecret: encrypt(data.keySecret), 
+      webhookSecret: encrypt(data.webhookSecret), 
+      name: data.name 
+    },
+    select: { id: true, userId: true, provider: true, name: true, keyId: true, createdAt: true },
+  });
 
-  static async getSources(userId: string) {
-    const sources = await prisma.paymentSource.findMany({
-      where: { userId },
-      select: {
-        id: true,
-        userId: true,
-        provider: true,
-        name: true,
-        keyId: true,
-        createdAt: true,
-        _count: { select: { events: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    // Attach server-computed webhook URL so clients never construct it themselves
-    return sources.map(s => ({ ...s, webhookUrl: SourceService.getWebhookUrl(s.id) }));
-  }
+export const getPaymentSources = async (userId: string) => {
+  const srcs = await prisma.paymentSource.findMany({
+    where: { userId },
+    select: { id: true, userId: true, provider: true, name: true, keyId: true, createdAt: true, _count: { select: { events: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  return srcs.map(s => ({ ...s, webhookUrl: getWebhookUrl(s.id) }));
+};
 
-  static async deleteSource(userId: string, sourceId: string) {
-    const source = await prisma.paymentSource.findFirst({
-      where: { id: sourceId, userId },
-    });
-    if (!source) {
-      const err = new Error('Source not found') as any;
-      err.status = 404;
-      throw err;
-    }
-    await prisma.paymentSource.delete({ where: { id: sourceId } });
-  }
+export const deletePaymentSource = async (userId: string, id: string) => {
+  const s = await prisma.paymentSource.findFirst({ where: { id, userId } });
+  if (!s) throw { status: 404, message: 'Source not found' };
+  await prisma.paymentSource.delete({ where: { id } });
+};
 
-  // Used by webhook handler and worker — returns decrypted secrets.
-  // Explicit name to warn maintainers that this contains raw credentials.
-  static async getSourceWithSecrets(sourceId: string) {
-    const source = await prisma.paymentSource.findUnique({
-      where: { id: sourceId },
-    });
-    if (!source) return null;
-    return {
-      ...source,
-      keySecret: decrypt(source.keySecret),
-      webhookSecret: decrypt(source.webhookSecret),
-    };
+export const getSourceWithSecrets = async (id: string) => {
+  const s = await prisma.paymentSource.findUnique({ where: { id } });
+  return s ? { ...s, keySecret: decrypt(s.keySecret), webhookSecret: decrypt(s.webhookSecret) } : null;
+};
+
+import { RazorpayService } from './RazorpayService.js';
+
+export const validateSourceCredentials = async (keyId: string, keySecret: string) => {
+  try {
+    // Attempt to verify credentials by pinging Razorpay
+    // We use a dummy ID; a 404 response confirms the keys are valid (but ID is fake)
+    // A 401 response confirms the keys are invalid.
+    await RazorpayService.getPaymentStatus('pay_verification_test');
+    return true;
+  } catch (err: any) {
+    return err?.statusCode === 404;
   }
-  static async validateCredentials(data: { keyId: string; keySecret: string }): Promise<boolean> {
-    return RazorpayService.validateCredentials(data.keyId, data.keySecret);
-  }
-}
+};

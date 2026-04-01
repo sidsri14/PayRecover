@@ -3,136 +3,79 @@ import bcrypt from 'bcrypt';
 import pino from 'pino';
 import { prisma } from '../utils/prisma.js';
 import { generateToken } from '../utils/jwt.js';
-import { AuditService } from './audit.service.js';
+import { logAuditAction } from './audit.service.js';
 import { sendEmailVerificationEmail, sendPasswordResetEmail } from './email.service.js';
 
 const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
-
-interface AuthData { email: string; password: string; }
-
 const VERIFY_EXPIRY_HOURS = 24;
 const RESET_EXPIRY_MINUTES = 60;
 
-export class AuthService {
-  static async register(data: AuthData) {
-    const { email, password } = data;
+export const registerUser = async (data: any) => {
+  const { email, password } = data;
+  if (await prisma.user.findUnique({ where: { email } })) throw new Error('User already exists');
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      throw new Error('User already exists');
-    }
+  const hashed = await bcrypt.hash(password, 12);
+  const vToken = crypto.randomBytes(32).toString('hex');
+  const user = await prisma.user.create({
+    data: { 
+      email, password: hashed, plan: 'free', 
+      emailVerifyToken: vToken, 
+      emailVerifyExpiry: new Date(Date.now() + VERIFY_EXPIRY_HOURS * 3600000) 
+    },
+  });
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const emailVerifyToken = crypto.randomBytes(32).toString('hex');
-    const emailVerifyExpiry = new Date(Date.now() + VERIFY_EXPIRY_HOURS * 60 * 60 * 1000);
+  const token = generateToken(user.id);
+  sendEmailVerificationEmail(email, {
+    verifyLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${vToken}`,
+  }).catch(e => logger.error(e));
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        emailVerifyToken,
-        emailVerifyExpiry,
-        plan: 'free', // explicit — don't rely on schema default
-      },
-    });
+  await logAuditAction(user.id, 'USER_REGISTER', 'User', user.id, { email });
+  return { user: { id: user.id, email }, token };
+};
 
-    const token = generateToken(user.id);
+export const loginUser = async (data: any) => {
+  const user = await prisma.user.findUnique({ where: { email: data.email } });
+  if (!user || !(await bcrypt.compare(data.password, user.password))) throw new Error('Invalid credentials');
 
-    // Fire-and-forget: don't block registration if email fails
-    void sendEmailVerificationEmail(email, {
-      verifyLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${emailVerifyToken}`,
-    }).catch(err => logger.error({ err }, 'Failed to send verification email'));
+  const token = generateToken(user.id);
+  await logAuditAction(user.id, 'USER_LOGIN', 'User', user.id);
+  return { user: { id: user.id, email: user.email }, token };
+};
 
-    await AuditService.logAction(user.id, 'USER_REGISTER', 'User', user.id, { email: user.email });
+export const verifyUserEmail = async (token: string) => {
+  const u = await prisma.user.findUnique({ where: { emailVerifyToken: token } });
+  if (!u || (u.emailVerifyExpiry && u.emailVerifyExpiry < new Date())) throw { status: 400, message: 'Expired or invalid token' };
 
-    return { user: { id: user.id, email: user.email }, token };
-  }
+  await prisma.user.update({ where: { id: u.id }, data: { emailVerified: true, emailVerifyToken: null, emailVerifyExpiry: null } });
+  await logAuditAction(u.id, 'EMAIL_VERIFIED', 'User', u.id);
+  return { message: 'Verified!' };
+};
 
-  static async verifyEmail(token: string) {
-    const user = await prisma.user.findUnique({ where: { emailVerifyToken: token } });
-    if (!user) {
-      const err = new Error('Invalid or expired verification token') as any;
-      err.status = 400;
-      throw err;
-    }
-    if (user.emailVerifyExpiry && user.emailVerifyExpiry < new Date()) {
-      const err = new Error('Verification token has expired — please request a new one') as any;
-      err.status = 400;
-      throw err;
-    }
+export const requestPassReset = async (email: string) => {
+  const u = await prisma.user.findUnique({ where: { email } });
+  if (!u) return { message: 'Check your email' };
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { emailVerified: true, emailVerifyToken: null, emailVerifyExpiry: null },
-    });
+  const rToken = crypto.randomBytes(32).toString('hex');
+  await prisma.user.update({ 
+    where: { id: u.id }, 
+    data: { passwordResetToken: rToken, passwordResetExpiry: new Date(Date.now() + RESET_EXPIRY_MINUTES * 60000) } 
+  });
 
-    await AuditService.logAction(user.id, 'EMAIL_VERIFIED', 'User', user.id);
-    return { message: 'Email verified successfully' };
-  }
+  sendPasswordResetEmail(email, {
+    resetLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${rToken}`,
+    expiresInMinutes: RESET_EXPIRY_MINUTES,
+  }).catch(e => logger.error(e));
 
-  static async requestPasswordReset(email: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
+  await logAuditAction(u.id, 'PASSWORD_RESET_REQUESTED', 'User', u.id);
+  return { message: 'Check your email' };
+};
 
-    // Always return the same message — don't leak whether email exists
-    if (!user) return { message: 'If that email exists, a reset link has been sent' };
+export const completePassReset = async (token: string, pass: string) => {
+  const u = await prisma.user.findUnique({ where: { passwordResetToken: token } });
+  if (!u || (u.passwordResetExpiry && u.passwordResetExpiry < new Date())) throw { status: 400, message: 'Expired or invalid token' };
 
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetExpiry = new Date(Date.now() + RESET_EXPIRY_MINUTES * 60 * 1000);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordResetToken: resetToken, passwordResetExpiry: resetExpiry },
-    });
-
-    void sendPasswordResetEmail(email, {
-      resetLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`,
-      expiresInMinutes: RESET_EXPIRY_MINUTES,
-    }).catch(err => logger.error({ err }, 'Failed to send password reset email'));
-
-    await AuditService.logAction(user.id, 'PASSWORD_RESET_REQUESTED', 'User', user.id);
-    return { message: 'If that email exists, a reset link has been sent' };
-  }
-
-  static async resetPassword(token: string, newPassword: string) {
-    const user = await prisma.user.findUnique({ where: { passwordResetToken: token } });
-    if (!user) {
-      const err = new Error('Invalid or expired reset token') as any;
-      err.status = 400;
-      throw err;
-    }
-    if (user.passwordResetExpiry && user.passwordResetExpiry < new Date()) {
-      const err = new Error('Reset token has expired — please request a new one') as any;
-      err.status = 400;
-      throw err;
-    }
-
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { password: hashedPassword, passwordResetToken: null, passwordResetExpiry: null },
-    });
-
-    await AuditService.logAction(user.id, 'PASSWORD_RESET_COMPLETED', 'User', user.id);
-    return { message: 'Password reset successfully' };
-  }
-
-  static async login(data: AuthData) {
-    const { email, password } = data;
-
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      throw new Error('Invalid credentials');
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      throw new Error('Invalid credentials');
-    }
-
-    const token = generateToken(user.id);
-
-    await AuditService.logAction(user.id, 'USER_LOGIN', 'User', user.id);
-
-    return { user: { id: user.id, email: user.email }, token };
-  }
-}
+  const hashed = await bcrypt.hash(pass, 12);
+  await prisma.user.update({ where: { id: u.id }, data: { password: hashed, passwordResetToken: null, passwordResetExpiry: null } });
+  await logAuditAction(u.id, 'PASSWORD_RESET_COMPLETED', 'User', u.id);
+  return { message: 'Reset successful' };
+};

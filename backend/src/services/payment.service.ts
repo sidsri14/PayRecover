@@ -1,275 +1,171 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma.js';
-import { AuditService } from './audit.service.js';
+import { logAuditAction } from './audit.service.js';
 
-// Comprehensive payload type for worker processing
 export type FailedPaymentWithLinks = Prisma.FailedPaymentGetPayload<{
   include: { recoveryLinks: { orderBy: { createdAt: 'desc' }, take: 1 } }
 }>;
 
-const ZERO = {
-  failedAmount: 0,
-  recoveredAmount: 0,
-  recoveryRate: 0,
-  recoveredThisWeek: 0,
-  recoveredThisMonth: 0,
-  recoveredViaLink: 0,
+const ZERO_METRICS = {
+  failedAmount: 0, recoveredAmount: 0, recoveryRate: 0,
+  recoveredThisWeek: 0, recoveredThisMonth: 0, recoveredViaLink: 0,
 };
 
-export class PaymentService {
-  static async getPayments(userId: string, options: { status?: string; search?: string; page?: number; limit?: number } = {}) {
-    const { status, search, page = 1, limit = 50 } = options;
-    const skip = (page - 1) * limit;
+// Exported so recovery.processor.ts can schedule BullMQ jobs with the same delays.
+// Index = current retryCount (before increment): [0→retry1 after 24h, 1→retry2 after 72h]
+export const RETRY_DELAYS_MS = [24 * 60 * 60 * 1000, 72 * 60 * 60 * 1000] as const;
 
-    const where: Prisma.FailedPaymentWhereInput = { userId };
-    if (status) where.status = status;
-    if (search) {
-      where.OR = [
-        { customerEmail: { contains: search } },
-        { paymentId: { contains: search } },
-        { customerName: { contains: search } },
-      ];
-    }
+/** Retrieves a paginated list of failed payments with optional filters. */
+export const getPaymentsList = async (userId: string, { status, search, page = 1, limit = 50 }: any = {}) => {
+  const where: Prisma.FailedPaymentWhereInput = { 
+    userId,
+    ...(status && { status }),
+    ...(search && { OR: [
+      { customerEmail: { contains: search } },
+      { paymentId: { contains: search } },
+      { customerName: { contains: search } },
+    ]}),
+  };
 
-    const [payments, total] = await Promise.all([
-      prisma.failedPayment.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-        include: { recoveryLinks: { orderBy: { createdAt: 'desc' }, take: 1 } },
+  const [payments, total] = await Promise.all([
+    prisma.failedPayment.findMany({
+      where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit,
+      include: { recoveryLinks: { orderBy: { createdAt: 'desc' }, take: 1 } },
+    }),
+    prisma.failedPayment.count({ where }),
+  ]);
+
+  return { payments, total, page, limit, pages: Math.ceil(total / limit) };
+};
+
+export const getPaymentDetails = (userId: string, id: string) => 
+  prisma.failedPayment.findFirstOrThrow({
+    where: { id, userId },
+    include: {
+      recoveryLinks: { orderBy: { createdAt: 'desc' } },
+      reminders: { orderBy: { sentAt: 'desc' } },
+      event: true,
+    },
+  });
+
+export const markPaymentRecovered = async (failedPaymentId: string, userId: string, via: 'link' | 'external' = 'link') => {
+  await prisma.failedPayment.update({
+    where: { id: failedPaymentId },
+    data: { status: 'recovered', recoveredAt: new Date(), recoveredVia: via },
+  });
+  await logAuditAction(userId, 'PAYMENT_RECOVERED', 'FailedPayment', failedPaymentId, { via });
+};
+
+export const markPaymentAbandoned = async (failedPaymentId: string, userId: string) => {
+  await prisma.failedPayment.update({ where: { id: failedPaymentId }, data: { status: 'abandoned' } });
+  await logAuditAction(userId, 'PAYMENT_ABANDONED', 'FailedPayment', failedPaymentId);
+};
+
+/** Optimized background processing: Fetches up to 20 payments ready for retry. */
+export const getPendingRetries = async (): Promise<FailedPaymentWithLinks[]> => {
+  const lockExpiry = new Date(Date.now() - 30 * 60 * 1000);
+  const now = new Date();
+
+  const candidates = await prisma.failedPayment.findMany({
+    where: {
+      status: { in: ['pending', 'retrying'] },
+      retryCount: { lt: 3 },
+      nextRetryAt: { lte: now },
+      user: { plan: 'paid' },
+      OR: [{ lockedAt: null }, { lockedAt: { lt: lockExpiry } }],
+    },
+    select: { id: true },
+    take: 20,
+  });
+
+  if (!candidates.length) return [];
+  const ids = candidates.map(c => c.id);
+
+  await prisma.failedPayment.updateMany({ where: { id: { in: ids } }, data: { lockedAt: now } });
+  return (await prisma.failedPayment.findMany({
+    where: { id: { in: ids }, lockedAt: now },
+    include: { recoveryLinks: { orderBy: { createdAt: 'desc' }, take: 1 } },
+  })) as FailedPaymentWithLinks[];
+};
+
+export const releasePaymentLock = (id: string) => 
+  prisma.failedPayment.update({ where: { id }, data: { lockedAt: null } });
+
+export const recordRetryReminder = async (id: string, dayOffset: number, type: string) => {
+  const p = await prisma.failedPayment.findUnique({ where: { id }, select: { retryCount: true } });
+  const count = (p?.retryCount ?? 0) + 1;
+  const delay = RETRY_DELAYS_MS[p?.retryCount ?? 0] ?? null;
+
+  await prisma.$transaction([
+    prisma.reminder.create({ data: { failedPaymentId: id, dayOffset, type, status: 'sent' } }),
+    prisma.failedPayment.update({
+      where: { id },
+      data: { 
+        retryCount: count, lastRetryAt: new Date(), 
+        nextRetryAt: delay ? new Date(Date.now() + (delay as number)) : null,
+        status: 'retrying', lockedAt: null 
+      },
+    }),
+  ]);
+  return count;
+};
+
+export const createRecoveryLinkRecord = (failedPaymentId: string, url: string) =>
+  prisma.recoveryLink.create({ data: { failedPaymentId, url } });
+
+export const triggerManualRetry = async (userId: string, id: string) => {
+  const p = await prisma.failedPayment.findFirst({ where: { id, userId } });
+  if (!p) throw { status: 404, message: 'Payment not found' };
+  if (!['pending', 'retrying'].includes(p.status)) throw { status: 400, message: 'Invalid status' };
+  await prisma.failedPayment.update({ where: { id }, data: { nextRetryAt: new Date() } });
+};
+
+export const getPaymentMetrics = async (userId: string) => {
+  try {
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Optimized: Combine basic sums/counts into one groupBy instead of 5 separate aggregates
+    const [statsByStatus, weekRecovered, monthRecovered, viaLinkRecovered] = await Promise.all([
+      prisma.failedPayment.groupBy({
+        by: ['status'], where: { userId }, _sum: { amount: true }, _count: true 
       }),
-      prisma.failedPayment.count({ where }),
+      prisma.failedPayment.aggregate({ where: { userId, status: 'recovered', recoveredAt: { gte: weekAgo } }, _sum: { amount: true } }),
+      prisma.failedPayment.aggregate({ where: { userId, status: 'recovered', recoveredAt: { gte: monthAgo } }, _sum: { amount: true } }),
+      prisma.failedPayment.aggregate({ where: { userId, status: 'recovered', recoveredVia: 'link' }, _sum: { amount: true } }),
     ]);
+
+    const stats = Object.fromEntries(statsByStatus.map(s => [s.status, { sum: s._sum.amount ?? 0, count: s._count }]));
+    const totalFailedSum = Object.values(stats).reduce((acc, s) => acc + s.sum, 0);
+    const recoveredSum = stats['recovered']?.sum ?? 0;
 
     return {
-      payments,
-      total,
-      page,
-      limit,
-      pages: Math.ceil(total / limit),
+      failedAmount: totalFailedSum,
+      recoveredAmount: recoveredSum,
+      recoveryRate: totalFailedSum > 0 ? Math.round((recoveredSum / totalFailedSum) * 1000) / 1000 : 0,
+      recoveredThisWeek: weekRecovered._sum.amount ?? 0,
+      recoveredThisMonth: monthRecovered._sum.amount ?? 0,
+      recoveredViaLink: viaLinkRecovered._sum.amount ?? 0,
+      counts: Object.fromEntries(Object.entries(stats).map(([k, v]) => [k, v.count])),
     };
+  } catch (err) {
+    console.error('Metrics Error:', err);
+    return { ...ZERO_METRICS, counts: {} };
   }
+};
 
-  static async getPaymentById(userId: string, id: string) {
-    const payment = await prisma.failedPayment.findFirst({
-      where: { id, userId },
-      include: {
-        recoveryLinks: { orderBy: { createdAt: 'desc' } },
-        reminders: { orderBy: { sentAt: 'desc' } },
-        event: true,
-      },
-    });
-
-    if (!payment) {
-      const err = new Error('Payment not found') as any;
-      err.status = 404;
-      throw err;
-    }
-
-    return payment;
-  }
-
-  static async markRecovered(failedPaymentId: string, userId: string, via: 'link' | 'external' = 'link') {
-    await prisma.failedPayment.update({
-      where: { id: failedPaymentId },
-      data: { status: 'recovered', recoveredAt: new Date(), recoveredVia: via },
-    });
-    
-    // Log the success audit trail
-    await AuditService.logAction(userId, 'PAYMENT_RECOVERED', 'FailedPayment', failedPaymentId, { via });
-  }
-
-  static async markAbandoned(failedPaymentId: string, userId: string) {
-    await prisma.failedPayment.update({
-      where: { id: failedPaymentId },
-      data: { status: 'abandoned' },
-    });
-    await AuditService.logAction(userId, 'PAYMENT_ABANDONED', 'FailedPayment', failedPaymentId);
-  }
-
-  static async getPendingForRetry(): Promise<FailedPaymentWithLinks[]> {
-    const lockExpiry = new Date(Date.now() - 30 * 60 * 1000); // 30 min lock expiry
-    const now = new Date();
-
-    // 1. Find payments that are due and not locked (or lock expired)
-    const candidates = await prisma.failedPayment.findMany({
-      where: {
-        status: { in: ['pending', 'retrying'] },
-        retryCount: { lt: 3 },
-        nextRetryAt: { lte: now },
-        user: { plan: { equals: 'paid' } },
-        OR: [
-          { lockedAt: null },
-          { lockedAt: { lt: lockExpiry } },
-        ],
-      },
-      select: { id: true },
-      take: 20,
-    });
-
-    if (candidates.length === 0) return [];
-
-    const candidateIds = candidates.map(c => c.id);
-
-    // 2. Set advisory lock
-    await prisma.failedPayment.updateMany({
-      where: { id: { in: candidateIds } },
-      data: { lockedAt: now },
-    });
-
-    // 3. Fetch full records
-    const results = await prisma.failedPayment.findMany({
-      where: { id: { in: candidateIds }, lockedAt: now },
-      include: {
-        recoveryLinks: { orderBy: { createdAt: 'desc' }, take: 1 },
-      },
-    });
-
-    return results as FailedPaymentWithLinks[];
-  }
-
-  static async releaseLock(id: string) {
-    await prisma.failedPayment.update({
-      where: { id },
-      data: { lockedAt: null },
-    });
-  }
-
-  static async recordReminderAndIncrementRetry(
-    failedPaymentId: string,
-    dayOffset: number,
-    type: string
-  ): Promise<number> {
-    const payment = await prisma.failedPayment.findUnique({
-      where: { id: failedPaymentId },
-      select: { retryCount: true },
-    });
-    
-    const currentCount = payment?.retryCount ?? 0;
-    const newCount = currentCount + 1;
-    const delayMs = PaymentService.RETRY_DELAYS_MS[currentCount] ?? null;
-    const nextRetryAt = delayMs !== null ? new Date(Date.now() + delayMs) : null;
-
-    await prisma.$transaction([
-      prisma.reminder.create({
-        data: { failedPaymentId, dayOffset, type, status: 'sent' },
-      }),
-      prisma.failedPayment.update({
-        where: { id: failedPaymentId },
-        data: {
-          retryCount: newCount,
-          lastRetryAt: new Date(),
-          nextRetryAt,
-          status: 'retrying',
-          lockedAt: null, // release advisory lock
-        },
-      }),
-    ]);
-
-    return newCount;
-  }
-
-  static async createRecoveryLink(failedPaymentId: string, url: string) {
-    return prisma.recoveryLink.create({
-      data: { failedPaymentId, url },
-    });
-  }
-
-  static async triggerManualRetry(userId: string, failedPaymentId: string) {
-    const payment = await prisma.failedPayment.findFirst({
-      where: { id: failedPaymentId, userId },
-    });
-    
-    if (!payment) {
-      throw new Error('Payment not found');
-    }
-    
-    if (!['pending', 'retrying'].includes(payment.status)) {
-      throw new Error('Payment cannot be retried in its current state');
-    }
-    
-    await prisma.failedPayment.update({
-      where: { id: failedPaymentId },
-      data: { nextRetryAt: new Date() },
-    });
-  }
-
-  static async getDashboardStats(userId: string) {
-    try {
-      const metrics = await PaymentService.getMetrics(userId);
-      const countsAgg = await prisma.failedPayment.groupBy({
-        by: ['status'],
-        where: { userId },
-        _count: true,
-      });
-
-      const counts = { pending: 0, retrying: 0, recovered: 0, abandoned: 0 };
-      countsAgg.forEach(c => {
-        if (c.status in counts) {
-          (counts as any)[c.status] = c._count;
-        }
-      });
-
-      return {
-        totalFailed: counts.pending + counts.retrying,
-        totalRecovered: counts.recovered,
-        recoveryRate: Math.round(metrics.recoveryRate * 100 * 10) / 10, // decimal → percentage, 1dp
-        totalFailedAmount: metrics.failedAmount,
-        totalRecoveredAmount: metrics.recoveredAmount,
-        recoveredThisWeek: metrics.recoveredThisWeek,
-        recoveredThisMonth: metrics.recoveredThisMonth,
-        counts,
-      };
-    } catch {
-      return {
-        totalFailed: 0,
-        totalRecovered: 0,
-        recoveryRate: 0,
-        totalFailedAmount: 0,
-        totalRecoveredAmount: 0,
-        recoveredThisWeek: 0,
-        recoveredThisMonth: 0,
-        counts: { pending: 0, retrying: 0, recovered: 0, abandoned: 0 },
-      };
-    }
-  }
-
-  static async getMetrics(userId: string) {
-    try {
-      const now = new Date();
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-      const [totalAgg, recoveredAgg, weekAgg, monthAgg, viaLinkAgg] = await Promise.all([
-        prisma.failedPayment.aggregate({ where: { userId }, _sum: { amount: true } }),
-        prisma.failedPayment.aggregate({ where: { userId, status: 'recovered' }, _sum: { amount: true } }),
-        prisma.failedPayment.aggregate({ where: { userId, status: 'recovered', recoveredAt: { gte: weekAgo } }, _sum: { amount: true } }),
-        prisma.failedPayment.aggregate({ where: { userId, status: 'recovered', recoveredAt: { gte: monthAgo } }, _sum: { amount: true } }),
-        prisma.failedPayment.aggregate({ where: { userId, status: 'recovered', recoveredVia: 'link' }, _sum: { amount: true } }),
-      ]);
-
-      const failedAmount = totalAgg._sum.amount ?? 0;
-      const recoveredAmount = recoveredAgg._sum.amount ?? 0;
-      const recoveryRate = failedAmount > 0 ? recoveredAmount / failedAmount : 0;
-
-      return {
-        failedAmount,
-        recoveredAmount,
-        recoveryRate: Math.round(recoveryRate * 1000) / 1000,
-        recoveredThisWeek: weekAgg._sum.amount ?? 0,
-        recoveredThisMonth: monthAgg._sum.amount ?? 0,
-        recoveredViaLink: viaLinkAgg._sum.amount ?? 0,
-      };
-    } catch (error) {
-      console.error('[PaymentService.getMetrics Failure]', error);
-      return ZERO;
-    }
-  }
-
-  private static readonly RETRY_DELAYS_MS: (number | null)[] = [
-    24 * 60 * 60 * 1000,  // after retry 0 → wait 24h
-    72 * 60 * 60 * 1000,  // after retry 1 → wait 72h
-    null,                  // after retry 2 → no more retries
-  ];
-}
+export const getFullDashboardStats = async (userId: string) => {
+  const m = await getPaymentMetrics(userId);
+  const counts = { pending: 0, retrying: 0, recovered: 0, abandoned: 0, ...m.counts };
+  return {
+    totalFailed: (counts.pending || 0) + (counts.retrying || 0),
+    totalRecovered: counts.recovered || 0,
+    recoveryRate: Math.round(m.recoveryRate * 1000) / 10, // decimal → percentage
+    totalFailedAmount: m.failedAmount,
+    totalRecoveredAmount: m.recoveredAmount,
+    recoveredThisWeek: m.recoveredThisWeek,
+    recoveredThisMonth: m.recoveredThisMonth,
+    counts,
+  };
+};

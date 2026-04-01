@@ -1,22 +1,18 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
-import { PaymentService } from '../services/payment.service.js';
-import { successResponse, errorResponse } from '../utils/apiResponse.js';
+import { getPaymentMetrics, getFullDashboardStats } from '../services/payment.service.js';
+import { successResponse } from '../utils/apiResponse.js';
 
-export const getDashboardStats = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const getDashboardStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const stats = await PaymentService.getDashboardStats(req.userId!);
+    const stats = await getFullDashboardStats(req.userId!);
     successResponse(res, stats);
-  } catch (error: any) {
-    errorResponse(res, error.message, 500);
-  }
+  } catch (err) { next(err); }
 };
 
-export const getMetrics = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const getMetrics = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const metrics = await PaymentService.getMetrics(req.userId!);
+    const metrics = await getPaymentMetrics(req.userId!);
     successResponse(res, metrics);
-  } catch (error: any) {
-    errorResponse(res, error.message, 500);
-  }
+  } catch (err) { next(err); }
 };

@@ -1,114 +1,66 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
-import { AuthService } from '../services/auth.service.js';
+import { registerUser, loginUser, verifyUserEmail, requestPassReset, completePassReset } from '../services/auth.service.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import { prisma } from '../utils/prisma.js';
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
-  path: '/',
-  maxAge: 24 * 60 * 60 * 1000, // 24 hours
-};
+const COOKIE_OPS = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' as const, path: '/', maxAge: 24 * 3600000 };
 
-export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { user, token } = await AuthService.register(req.body);
-    
-    res.cookie('token', token, COOKIE_OPTIONS);
+    const { user, token } = await registerUser(req.body);
+    res.cookie('token', token, COOKIE_OPS);
     successResponse(res, { user }, 201);
-  } catch (error: any) {
-    if (error.message === 'User already exists') {
-      errorResponse(res, error.message, 400);
-    } else {
-      next(error);
-    }
+  } catch (err: any) {
+    if (err.message === 'User already exists') return errorResponse(res, err.message, 400);
+    next(err);
   }
 };
 
-export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { user, token } = await AuthService.login(req.body);
-    
-    res.cookie('token', token, COOKIE_OPTIONS);
-    successResponse(res, { user }, 200);
-  } catch (error: any) {
-    if (error.message === 'Invalid credentials') {
-      errorResponse(res, error.message, 401);
-    } else {
-      next(error);
-    }
+    const { user, token } = await loginUser(req.body);
+    res.cookie('token', token, COOKIE_OPS);
+    successResponse(res, { user });
+  } catch (err: any) {
+    if (err.message === 'Invalid credentials') return errorResponse(res, err.message, 401);
+    next(err);
   }
 };
 
-export const logout = async (_req: Request, res: Response): Promise<void> => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict' as const,
-    path: '/',
-  });
-  // Also clear the CSRF cookie so a subsequent login gets a fresh token
-  res.clearCookie('x-csrf-token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict' as const,
-    path: '/',
-  });
-  successResponse(res, { message: 'Logged out successfully' }, 200);
+export const logout = (_req: Request, res: Response) => {
+  res.clearCookie('token', COOKIE_OPS);
+  res.clearCookie('x-csrf-token', COOKIE_OPS);
+  successResponse(res, { message: 'Logged out' });
 };
 
-export const verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const verifyEmail = async (req: Request, res: Response) => {
   try {
-    const token = typeof req.query.token === 'string' ? req.query.token : '';
-    const result = await AuthService.verifyEmail(token);
-    successResponse(res, result);
-  } catch (error: any) {
-    errorResponse(res, error.message, error.status || 400);
-  }
+    const r = await verifyUserEmail(String(req.query.token || ''));
+    successResponse(res, r);
+  } catch (err: any) { errorResponse(res, err.message, err.status || 400); }
 };
 
-export const requestPasswordReset = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const requestPasswordReset = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email } = req.body;
-    if (typeof email !== 'string') { errorResponse(res, 'Email is required', 400); return; }
-    const result = await AuthService.requestPasswordReset(email);
-    successResponse(res, result);
-  } catch (error) {
-    next(error);
-  }
+    if (!email) return errorResponse(res, 'Email required', 400);
+    successResponse(res, await requestPassReset(email));
+  } catch (err) { next(err); }
 };
 
-export const resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const resetPassword = async (req: Request, res: Response) => {
   try {
     const { token, password } = req.body;
-    if (typeof token !== 'string' || typeof password !== 'string') {
-      errorResponse(res, 'token and password are required', 400);
-      return;
-    }
-    if (password.length < 8) { errorResponse(res, 'Password must be at least 8 characters', 400); return; }
-    const result = await AuthService.resetPassword(token, password);
-    successResponse(res, result);
-  } catch (error: any) {
-    errorResponse(res, error.message, error.status || 400);
-  }
+    if (!token || !password || password.length < 8) return errorResponse(res, 'Invalid data', 400);
+    successResponse(res, await completePassReset(token, password));
+  } catch (err: any) { errorResponse(res, err.message, err.status || 400); }
 };
 
-export const getMe = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const getMe = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { id: true, email: true, plan: true, createdAt: true },
-    });
-
-    if (!user) {
-      errorResponse(res, 'User not found', 404);
-      return;
-    }
-
-    successResponse(res, user, 200);
-  } catch (error) {
-    next(error);
-  }
+    const u = await prisma.user.findUnique({ where: { id: req.userId }, select: { id: true, email: true, plan: true, createdAt: true } });
+    if (!u) return errorResponse(res, 'User not found', 404);
+    successResponse(res, u);
+  } catch (err) { next(err); }
 };

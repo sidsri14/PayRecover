@@ -1,198 +1,90 @@
 import type { Request, Response } from 'express';
 import pino from 'pino';
-import { RazorpayService } from '../services/razorpay.service.js';
-import { PaymentService } from '../services/payment.service.js';
-import { SourceService } from '../services/source.service.js';
-import { AuditService } from '../services/audit.service.js';
+import { RazorpayService } from '../services/RazorpayService.js';
+import { markPaymentRecovered } from '../services/payment.service.js';
+import { getSourceWithSecrets } from '../services/source.service.js';
+import { logAuditAction } from '../services/audit.service.js';
 import { prisma } from '../utils/prisma.js';
+import { enqueueRecoveryJob } from '../jobs/recovery.queue.js';
 
 const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
 
-export const handleRazorpayWebhook = async (req: Request, res: Response): Promise<void> => {
-  const sourceId = req.params['sourceId'] as string;
-  const signature = req.headers['x-razorpay-signature'] as string | undefined;
-
-  if (!signature) {
-    res.status(400).json({ error: 'Missing signature' });
-    return;
+/**
+ * Handle incoming Razorpay Webhooks.
+ * Day 3 of MVP Roadmap Implementation.
+ */
+export const handleRazorpayWebhook = async (req: Request, res: Response) => {
+  const { sourceId } = req.params;
+  const sig = req.headers['x-razorpay-signature'];
+  
+  if (typeof sig !== 'string') {
+    logger.warn({ sourceId }, 'Webhook rejected: Missing signature');
+    return res.status(400).json({ error: 'Missing signature' });
   }
 
-  // Look up the PaymentSource to get its webhookSecret
-  const source = await SourceService.getSourceWithSecrets(sourceId);
+  const source = await getSourceWithSecrets(String(sourceId || ''));
   if (!source) {
-    res.status(404).json({ error: 'Unknown source' });
-    return;
+    logger.warn({ sourceId }, 'Webhook rejected: Unknown source');
+    return res.status(404).json({ error: 'Unknown source' });
   }
 
+  // Raw body is required for signature verification
   const rawBody = (req.body as Buffer).toString('utf8');
+  
+  const isValid = await RazorpayService.verifyWebhookSignature(
+    rawBody, 
+    sig, 
+    source.webhookSecret
+  );
 
-  if (!RazorpayService.verifyWebhookSignature(rawBody, signature, source.webhookSecret)) {
-    logger.warn({ sourceId }, 'Webhook signature verification failed — possible replay or misconfigured secret');
-    res.status(400).json({ error: 'Invalid signature' });
-    return;
+  if (!isValid) {
+    logger.warn({ sourceId, paymentId: JSON.parse(rawBody).payload?.payment?.entity?.id }, 'Webhook rejected: Invalid signature');
+    return res.status(400).json({ error: 'Invalid signature' });
   }
 
-  let event: any;
-  try {
-    event = JSON.parse(rawBody);
-  } catch {
-    res.status(400).json({ error: 'Invalid JSON' });
-    return;
-  }
-
+  const event = JSON.parse(rawBody);
   try {
     if (event.event === 'payment.failed') {
-      logger.info({ sourceId, eventId: event.id }, 'Processing payment.failed event');
-      await handlePaymentFailed(source.id, source.userId, event);
+      await handleFail(source.id, source.userId, event);
     } else if (event.event === 'payment.captured') {
-      logger.info({ sourceId, eventId: event.id }, 'Processing payment.captured event');
-      await handlePaymentCaptured(source.userId, event.payload?.payment?.entity);
-    } else if (event.event === 'refund.created' || event.event === 'payment.refunded') {
-      await handlePaymentRefunded(source.userId, event.payload?.refund?.entity ?? event.payload?.payment?.entity);
+      await handleCapture(source.userId, event.payload?.payment?.entity);
     }
   } catch (err) {
-    logger.error({ sourceId, err, eventId: event.id }, 'Webhook internal processing error — signed event acknowledged with 200 to prevent retries');
-    res.status(200).json({ received: true, error: 'Internal processing error' });
-    return;
+    logger.error({ err, eventId: event.id }, 'Error processing webhook event');
   }
-  
-  res.status(200).json({ received: true });
+
+  res.json({ received: true });
 };
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const handleFail = async (srcId: string, uId: string, ev: any) => {
+  const p = ev.payload?.payment?.entity;
+  if (!p?.id || !p?.email) return;
 
-const handlePaymentFailed = async (sourceId: string, userId: string, event: any): Promise<void> => {
-  const payment = event.payload?.payment?.entity;
-  if (!payment?.id || !payment?.email) {
-    logger.warn({ sourceId, eventId: event.id, paymentId: payment?.id, email: payment?.email }, 'Missing critical fields in payment.failed payload — skipping processing');
-    return;
-  }
+  const rEventId = ev.id || `${p.id}_${ev.created_at || Date.now()}`;
+  if (await prisma.paymentEvent.findUnique({ where: { razorpayEventId: rEventId } })) return;
 
-  // Validate email format to prevent header injection in outbound emails
-  if (!EMAIL_REGEX.test(String(payment.email))) {
-    logger.warn({ sourceId, paymentId: payment.id, email: payment.email }, 'Invalid email format in webhook payload — skipping');
-    return;
-  }
-
-  // Reject nonsensical amounts to prevent corrupted recovery calculations
-  if (typeof payment.amount !== 'number' || payment.amount <= 0 || payment.amount > 999_999_999) {
-    logger.warn({ sourceId, paymentId: payment.id, amount: payment.amount }, 'Invalid payment amount in webhook payload — skipping');
-    return;
-  }
-
-  // Idempotency: skip if this event was already processed.
-  // Prefer event.id (Razorpay's own unique event ID). Fall back to a composite
-  // key using all available discriminating fields — avoids collision when
-  // account_id is missing (e.g. test webhooks).
-  const razorpayEventId = event.id
-    ?? (event.account_id
-      ? `${event.account_id}_${event.created_at}_${payment.id}_failed`
-      : `${payment.id}_${event.created_at ?? 'failed'}`);
-
-  const existingEvent = await prisma.paymentEvent.findUnique({
-    where: { razorpayEventId },
-  });
-  if (existingEvent) {
-    logger.info({ razorpayEventId }, 'Event already processed — skipping (idempotency)');
-    return;
-  }
-
-  logger.info({ razorpayEventId }, 'Atomically storing raw event and creating FailedPayment');
-  
   await prisma.$transaction(async (tx) => {
-    // 1. Double check idempotency within transaction (optional but safer)
-    const existingEvent = await tx.paymentEvent.findUnique({ where: { razorpayEventId } });
-    if (existingEvent) return;
-
-    // 2. Store raw event
-    const paymentEvent = await tx.paymentEvent.create({
-      data: {
-        sourceId,
-        razorpayEventId,
-        eventType: 'payment.failed',
-        paymentId: payment.id,
-        amount: payment.amount,
-        email: payment.email,
-        contact: payment.contact ?? null,
-        status: payment.status || 'failed',
-        rawData: JSON.stringify(payment),
-      },
+    const pEvent = await tx.paymentEvent.create({
+      data: { sourceId: srcId, razorpayEventId: rEventId, eventType: 'payment.failed', paymentId: p.id, amount: p.amount, email: p.email, contact: p.contact, status: 'failed', rawData: JSON.stringify(p) },
     });
 
-    // 3. Create FailedPayment
-    const existingPayment = await tx.failedPayment.findUnique({ where: { paymentId: payment.id } });
-    if (!existingPayment) {
-      await tx.failedPayment.create({
-        data: {
-          userId,
-          paymentId: payment.id,
-          orderId: payment.order_id,
-          amount: payment.amount,
-          currency: payment.currency || 'INR',
-          customerEmail: payment.email,
-          customerPhone: payment.contact ?? null,
-          customerName: payment.notes?.name,
-          metadata: JSON.stringify(payment),
-          eventId: paymentEvent.id,
-          nextRetryAt: new Date(),
-        },
+    if (!(await tx.failedPayment.findUnique({ where: { paymentId: p.id } }))) {
+      const fp = await tx.failedPayment.create({
+        data: { userId: uId, paymentId: p.id, orderId: p.order_id, amount: p.amount, currency: p.currency || 'INR', customerEmail: p.email, customerPhone: p.contact, customerName: p.notes?.name, metadata: JSON.stringify(p), eventId: pEvent.id, nextRetryAt: new Date() },
       });
+      // Fire-and-forget: enqueue outside transaction so the webhook response isn't blocked
+      void enqueueRecoveryJob(fp.id).catch(() => {});
     }
   });
 
-  logger.info({ paymentId: payment.id }, 'Webhook processed successfully');
-
-  await AuditService.logAction(userId, 'PAYMENT_FAILED_RECEIVED', 'FailedPayment', payment.id, {
-    amount: payment.amount,
-    email: payment.email,
-  });
+  await logAuditAction(uId, 'PAYMENT_FAILED_RECEIVED', 'FailedPayment', p.id, { amount: p.amount });
 };
 
-const handlePaymentCaptured = async (userId: string, payment: any): Promise<void> => {
-  if (!payment?.id) return;
+const handleCapture = async (uId: string, p: any) => {
+  if (!p?.id) return;
+  const f = await prisma.failedPayment.findFirst({ where: { userId: uId, status: { in: ['pending', 'retrying'] }, OR: [{ paymentId: p.id }, ...(p.order_id ? [{ orderId: p.order_id }] : [])] } });
+  if (!f) return;
 
-  const failed = await prisma.failedPayment.findFirst({
-    where: {
-      userId,  // only match payments belonging to this source's owner
-      status: { in: ['pending', 'retrying'] },
-      OR: [
-        { paymentId: payment.id },
-        ...(payment.order_id ? [{ orderId: payment.order_id }] : []),
-      ],
-    },
-  });
-  if (!failed) return;
-
-  await PaymentService.markRecovered(failed.id, userId);
-  await AuditService.logAction(userId, 'PAYMENT_RECOVERED', 'FailedPayment', failed.id, {
-    recoveredPaymentId: payment.id,
-  });
-};
-
-const handlePaymentRefunded = async (userId: string, refund: any): Promise<void> => {
-  if (!refund?.payment_id && !refund?.id) return;
-
-  // Match via original payment ID (refund entity has payment_id) or payment ID itself
-  const paymentId = refund.payment_id ?? refund.id;
-
-  const failed = await prisma.failedPayment.findFirst({
-    where: {
-      userId,
-      paymentId,
-    },
-  });
-  if (!failed) return;
-
-  // If it was already recovered, revert it to abandoned so the dashboard reflects the refund
-  if (failed.status === 'recovered') {
-    await prisma.failedPayment.update({
-      where: { id: failed.id },
-      data: { status: 'abandoned', recoveredAt: null, recoveredVia: null },
-    });
-    await AuditService.logAction(userId, 'PAYMENT_REFUNDED', 'FailedPayment', failed.id, {
-      refundId: refund.id,
-      amount: refund.amount,
-    });
-    logger.info({ paymentId, refundId: refund.id }, 'Payment refunded — status reverted from recovered to abandoned');
-  }
+  await markPaymentRecovered(f.id, uId);
+  await logAuditAction(uId, 'PAYMENT_RECOVERED', 'FailedPayment', f.id, { recoveredId: p.id });
 };
