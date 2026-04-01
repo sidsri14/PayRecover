@@ -16,7 +16,7 @@ export const simulateFailure = async (req: AuthRequest, res: Response, next: Nex
         customerName: 'Demo Customer',
         customerEmail: 'demo@example.com',
         customerPhone: '+919999999999',
-        amount: 2999,
+        amount: 49900, // ₹499 in paise
         currency: 'INR',
         status: 'pending',
         metadata: JSON.stringify({ 

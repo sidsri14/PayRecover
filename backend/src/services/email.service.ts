@@ -24,11 +24,12 @@ function createTransport() {
   });
 }
 
+// Cached at module load — one connection pool for the process lifetime
+const transport = createTransport();
+
 const FROM_ADDRESS = process.env.SMTP_FROM || 'PayRecover <noreply@payrecover.app>';
 
 async function sendMail(to: string, subject: string, text: string, html?: string): Promise<void> {
-  const transport = createTransport();
-
   if (!transport) {
     // No SMTP configured — print to console so dev can see the content
     console.log('\n══════════════════════════════════════════════════');

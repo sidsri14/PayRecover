@@ -1,5 +1,8 @@
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
+import pino from 'pino';
+
+const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
 
 export class RazorpayService {
   static verifyWebhookSignature(rawBody: string, signature: string, secret: string): boolean {
@@ -66,7 +69,7 @@ export class RazorpayService {
       await razorpay.payments.all({ count: 1 });
       return true;
     } catch (error: any) {
-      console.error('[Razorpay Validation Failed]', error.message);
+      logger.error({ err: error.message }, '[Razorpay] Credential validation failed');
       return false;
     }
   }

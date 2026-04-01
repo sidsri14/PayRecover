@@ -166,5 +166,5 @@ const shutdown = async (signal: string): Promise<void> => {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-logger.info('RecoverPay Worker v2.0 — started');
+logger.info('PayRecover Worker v2.0 — started');
 processRecoveryQueue();

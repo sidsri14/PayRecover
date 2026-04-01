@@ -1,9 +1,12 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import pino from 'pino';
 import { prisma } from '../utils/prisma.js';
 import { generateToken } from '../utils/jwt.js';
 import { AuditService } from './audit.service.js';
 import { sendEmailVerificationEmail, sendPasswordResetEmail } from './email.service.js';
+
+const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
 
 interface AuthData { email: string; password: string; }
 
@@ -38,7 +41,7 @@ export class AuthService {
     // Fire-and-forget: don't block registration if email fails
     void sendEmailVerificationEmail(email, {
       verifyLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${emailVerifyToken}`,
-    }).catch(err => console.error('Failed to send verification email:', err));
+    }).catch(err => logger.error({ err }, 'Failed to send verification email'));
 
     await AuditService.logAction(user.id, 'USER_REGISTER', 'User', user.id, { email: user.email });
 
@@ -84,7 +87,7 @@ export class AuthService {
     void sendPasswordResetEmail(email, {
       resetLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`,
       expiresInMinutes: RESET_EXPIRY_MINUTES,
-    }).catch(err => console.error('Failed to send reset email:', err));
+    }).catch(err => logger.error({ err }, 'Failed to send password reset email'));
 
     await AuditService.logAction(user.id, 'PASSWORD_RESET_REQUESTED', 'User', user.id);
     return { message: 'If that email exists, a reset link has been sent' };

@@ -10,6 +10,8 @@ import paymentRoutes from './routes/payment.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import billingRoutes from './routes/billing.routes.js';
 import demoRoutes from './routes/demo.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
+import sourceRoutes from './routes/source.routes.js';
 import { prisma } from './utils/prisma.js';
 
 const app = express();
@@ -18,7 +20,21 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Security Middleware
-app.use(helmet());
+app.use(helmet({
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+    },
+  },
+}));
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173'],
   credentials: true
@@ -46,7 +62,7 @@ const globalLimiter = rateLimit({
 app.use('/api/', globalLimiter);
 
 // Health Check
-app.get('/health', async (req, res) => {
+app.get('/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.json({ status: 'ok', database: 'connected', version: '1.0.0' });
@@ -60,14 +76,16 @@ app.use('/api/auth', authRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/demo', demoRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/sources', sourceRoutes);
 
 // Error Handling
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[Error Handler]', err);
   const status = err.status || 500;
   res.status(status).json({
     error: err.message || 'Internal Server Error',
-    requestId: req.headers['x-request-id']
+    requestId: _req.headers['x-request-id']
   });
 });
 

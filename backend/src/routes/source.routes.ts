@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { connectSource, getSources, deleteSource, testConnection } from '../controllers/source.controller.js';
+
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { rateLimit } from 'express-rate-limit';
 
@@ -15,6 +16,7 @@ const apiLimiter = rateLimit({
 router.use(requireAuth, apiLimiter);
 
 router.post('/connect', connectSource);
+router.post('/test-connection', testConnection);
 router.get('/', getSources);
 router.delete('/:id', deleteSource);
 

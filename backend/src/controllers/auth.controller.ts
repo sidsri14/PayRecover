@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import type { AuthRequest } from '../middleware/auth.middleware.js';
 import { AuthService } from '../services/auth.service.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import { prisma } from '../utils/prisma.js';
@@ -94,7 +95,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
   }
 };
 
-export const getMe = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+export const getMe = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
