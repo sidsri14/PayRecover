@@ -10,6 +10,9 @@ const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const PaymentDetails = lazy(() => import('./pages/PaymentDetails'));
 const Sources = lazy(() => import('./pages/Sources'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 
 export type AuthUser = {
   id: string;
@@ -143,6 +146,9 @@ function PageTitle() {
       '/login': 'Sign In | PayRecover',
       '/register': 'Create Account | PayRecover',
       '/sources': 'Payment Sources | PayRecover',
+      '/forgot-password': 'Reset Password | PayRecover',
+      '/reset-password': 'New Password | PayRecover',
+      '/verify-email': 'Verify Account | PayRecover',
     };
     const path = window.location.pathname;
     document.title = titles[path] || 'PayRecover | Failed Payment Recovery';
@@ -209,6 +215,9 @@ function App() {
           <Routes>
             <Route path="/login" element={user ? <Navigate to="/" /> : <Login onLoginSuccess={(u) => setUser(u)} />} />
             <Route path="/register" element={user ? <Navigate to="/" /> : <Register onRegisterSuccess={(u) => setUser(u)} />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/*" element={
               user ? (
                 <Layout user={user} onLogout={handleLogout}>

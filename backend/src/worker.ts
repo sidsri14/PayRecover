@@ -84,9 +84,7 @@ const processRecoveryQueue = async (): Promise<void> => {
         }
 
         // Use existing recovery link if available, otherwise create one.
-        // Cast: recoveryLinks is included via getPendingForRetry() but stale Prisma DLL
-        // doesn't reflect it in types. tsc --noEmit is clean; remove cast after server restart.
-        const links = (payment as typeof payment & { recoveryLinks: Array<{ url: string }> }).recoveryLinks;
+        const links = payment.recoveryLinks;
         let paymentLink: string | undefined = links[0]?.url;
         if (!paymentLink) {
           paymentLink = await RazorpayService.createPaymentLink(keyId, keySecret, {

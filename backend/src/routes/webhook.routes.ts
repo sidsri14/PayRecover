@@ -14,6 +14,7 @@ const webhookLimiter = rateLimit({
   message: { error: 'Too many webhook requests' },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
 });
 
 router.post('/:sourceId', webhookLimiter, express.raw({ type: 'application/json', limit: '100kb' }), handleRazorpayWebhook);

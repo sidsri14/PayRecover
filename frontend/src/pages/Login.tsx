@@ -45,7 +45,7 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
               <ShieldAlert className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-stone-800 dark:text-stone-100">
-              RecoverPay
+              PayRecover
             </h1>
           </div>
 
@@ -91,6 +91,12 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
                   required
                 />
               </div>
+            </div>
+
+            <div className="flex justify-end pr-1">
+              <Link to="/forgot-password" title="Request Password Reset" className="text-xs font-semibold text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors">
+                Forgot password?
+              </Link>
             </div>
 
             <button
