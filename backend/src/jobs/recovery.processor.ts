@@ -45,53 +45,53 @@ export async function processRecoveryJob(job: Job<RecoveryJobData>): Promise<voi
   });
 
   try {
-    // 3. Create/Fetch Recovery Link using per-source credentials when available.
-    // Demo payments (no eventId/sourceId) fall back to global Razorpay env credentials.
-    let link: string | null = null;
-    const sourceId = payment.event?.sourceId;
-    if (sourceId) {
-      const source = await getSourceWithSecrets(sourceId);
-      if (source) {
-        link = await getPaymentLink(source.keyId, source.keySecret, {
-          amount: payment.amount,
-          currency: payment.currency,
-          customerName: payment.customerName,
-          customerEmail: payment.customerEmail,
-          customerPhone: payment.customerPhone,
-          referenceId: payment.id,
-          description: `Recovery for ${payment.paymentId}`,
-        });
-      }
-    }
-    if (!link) {
-      // Fallback: use global Razorpay credentials (for demo payments or missing source)
-      link = await RazorpayService.createPaymentLink(payment);
-    }
-
-    if (!link) {
-      // Both link generation paths failed (e.g. invalid test credentials).
-      // Release the lock and let BullMQ retry the job rather than storing a null URL.
-      logger.warn({ failedPaymentId }, 'Failed to generate recovery link — will retry');
-      throw new Error('Recovery link generation failed');
-    }
-
-    // Store link in DB with 7-day expiration — idempotency guard prevents duplicate
-    // rows if BullMQ retries this job after email send fails.
+    // 3. Create/Fetch Recovery Link — check DB first to avoid duplicate Razorpay API calls on retry.
     const existingLink = await prisma.recoveryLink.findFirst({
       where: { failedPaymentId },
       orderBy: { createdAt: 'desc' },
     });
+
+    let link: string;
     if (existingLink) {
       link = existingLink.url; // reuse existing link so email sends the correct URL
       logger.info({ failedPaymentId }, 'Reusing existing recovery link on job retry');
     } else {
+      // No existing link — create one via Razorpay.
+      // Use per-source credentials when available; fall back to global env credentials for demo payments.
+      let generatedLink: string | null = null;
+      const sourceId = payment.event?.sourceId;
+      if (sourceId) {
+        const source = await getSourceWithSecrets(sourceId);
+        if (source) {
+          generatedLink = await getPaymentLink(source.keyId, source.keySecret, {
+            amount: payment.amount,
+            currency: payment.currency,
+            customerName: payment.customerName,
+            customerEmail: payment.customerEmail,
+            customerPhone: payment.customerPhone,
+            referenceId: payment.id,
+            description: `Recovery for ${payment.paymentId}`,
+          });
+        }
+      }
+      if (!generatedLink) {
+        generatedLink = await RazorpayService.createPaymentLink(payment);
+      }
+
+      if (!generatedLink) {
+        // Both paths failed (e.g. invalid credentials). Release lock and let BullMQ retry.
+        logger.warn({ failedPaymentId }, 'Failed to generate recovery link — will retry');
+        throw new Error('Recovery link generation failed');
+      }
+
       await prisma.recoveryLink.create({
         data: {
           failedPaymentId,
-          url: link,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        }
+          url: generatedLink,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
       });
+      link = generatedLink;
     }
 
     // 4. Send Email (Initial or Reminder)

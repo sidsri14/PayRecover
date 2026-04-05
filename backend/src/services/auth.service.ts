@@ -49,6 +49,7 @@ export const loginUser = async (data: any) => {
 };
 
 export const verifyUserEmail = async (token: string) => {
+  if (!token) throw { status: 400, message: 'Token required' };
   const u = await prisma.user.findUnique({ where: { emailVerifyToken: token } });
   if (!u || (u.emailVerifyExpiry && u.emailVerifyExpiry < new Date())) throw { status: 400, message: 'Expired or invalid token' };
 
@@ -77,6 +78,7 @@ export const requestPassReset = async (email: string) => {
 };
 
 export const completePassReset = async (token: string, pass: string) => {
+  if (!token) throw { status: 400, message: 'Token required' };
   const u = await prisma.user.findUnique({ where: { passwordResetToken: token } });
   if (!u || (u.passwordResetExpiry && u.passwordResetExpiry < new Date())) throw { status: 400, message: 'Expired or invalid token' };
 

@@ -1,9 +1,12 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
+import pino from 'pino';
 import { prisma } from '../utils/prisma.js';
 import { successResponse } from '../utils/apiResponse.js';
 import { logAuditAction } from '../services/audit.service.js';
 import { enqueueRecoveryJob } from '../jobs/recovery.queue.js';
+
+const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
 
 export const simulateFailure = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -24,7 +27,7 @@ export const simulateFailure = async (req: AuthRequest, res: Response, next: Nex
       },
     });
     await logAuditAction(req.userId!, 'DEMO_FAILURE_SIMULATED', 'FailedPayment', p.id);
-    void enqueueRecoveryJob(p.id).catch(() => {});
+    void enqueueRecoveryJob(p.id).catch((err) => logger.error({ failedPaymentId: p.id, err }, 'Demo job enqueue failed'));
     successResponse(res, { message: 'Demo payment created', payment: p }, 201);
   } catch (err) { next(err); }
 };

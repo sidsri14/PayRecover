@@ -1,6 +1,9 @@
 import Razorpay from 'razorpay';
+import pino from 'pino';
 
-export const getRazorpayInstance = (keyId: string, keySecret: string) => 
+const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
+
+export const getRazorpayInstance = (keyId: string, keySecret: string) =>
   new Razorpay({ key_id: keyId, key_secret: keySecret });
 
 /** Generates a hosted payment link via Razorpay. */
@@ -21,7 +24,7 @@ export const getPaymentLink = async (keyId: string, keySecret: string, data: any
     });
     return link.short_url;
   } catch (err) {
-    console.error('[Razorpay Link Failure]', err);
+    logger.error({ err }, 'Razorpay payment link creation failed');
     return null;
   }
 };

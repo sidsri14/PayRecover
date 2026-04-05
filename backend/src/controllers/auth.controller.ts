@@ -36,8 +36,10 @@ export const logout = (_req: Request, res: Response) => {
 
 export const verifyEmail = async (req: Request, res: Response) => {
   try {
-    // Token arrives in POST body (frontend sends { token }) or query string (direct link click)
-    const token = req.body?.token || String(req.query.token || '');
+    // Token arrives in POST body (frontend sends { token }) or query string (direct link click).
+    // Guard against array values e.g. ?token=a&token=b which Express parses as string[].
+    const queryToken = Array.isArray(req.query.token) ? '' : String(req.query.token || '');
+    const token = req.body?.token || queryToken;
     const r = await verifyUserEmail(token);
     successResponse(res, r);
   } catch (err: any) { errorResponse(res, err.message, err.status || 400); }
@@ -61,7 +63,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 
 export const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const user = await updateUserProfile(req.userId, req.body);
+    const user = await updateUserProfile(req.userId!, req.body);
     successResponse(res, { user });
   } catch (err: any) {
     if (err.message === 'Email already in use') return errorResponse(res, err.message, 400);
@@ -75,7 +77,7 @@ export const updatePassword = async (req: AuthRequest, res: Response, next: Next
     if (!oldPassword || !newPassword || newPassword.length < 8) {
       return errorResponse(res, 'New password must be at least 8 characters', 400);
     }
-    const result = await changeUserPassword(req.userId, oldPassword, newPassword);
+    const result = await changeUserPassword(req.userId!, oldPassword, newPassword);
     successResponse(res, result);
   } catch (err: any) {
     if (err.message === 'Incorrect current password') return errorResponse(res, err.message, 401);

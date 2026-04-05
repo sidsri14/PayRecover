@@ -31,6 +31,7 @@ export const testConnection = async (req: AuthRequest, res: Response, next: Next
   try {
     const { keyId, keySecret } = req.body;
     if (typeof keyId !== 'string' || typeof keySecret !== 'string') return errorResponse(res, 'Key ID and Secret required', 400);
+    if (keyId.length > 100 || keySecret.length > 100) return errorResponse(res, 'Invalid credentials', 400);
 
     const ok = await validateSourceCredentials(keyId, keySecret);
     successResponse(res, { message: ok ? 'Verified!' : 'Failed' }, ok ? 200 : 401);

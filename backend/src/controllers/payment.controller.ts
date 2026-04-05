@@ -1,8 +1,11 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
+import pino from 'pino';
 import { getPaymentsList, getPaymentDetails, triggerManualRetry } from '../services/payment.service.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import { enqueueRecoveryJob } from '../jobs/recovery.queue.js';
+
+const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
 
 export const getPayments = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -34,7 +37,7 @@ export const manualRetry = async (req: AuthRequest, res: Response, next: NextFun
     const id = String(req.params.id || '');
     if (!id) return errorResponse(res, 'ID required', 400);
     await triggerManualRetry(req.userId!, id);
-    void enqueueRecoveryJob(id).catch(() => {}); // immediate job; fire-and-forget
+    void enqueueRecoveryJob(id).catch((err) => logger.error({ failedPaymentId: id, err }, 'Manual retry enqueue failed'));
     successResponse(res, { message: 'Retry queued' });
   } catch (err) { next(err); }
 };

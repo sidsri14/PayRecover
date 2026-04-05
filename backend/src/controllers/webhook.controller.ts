@@ -44,7 +44,14 @@ export const handleRazorpayWebhook = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Invalid signature' });
   }
 
-  const event = JSON.parse(rawBody);
+  let event: any;
+  try {
+    event = JSON.parse(rawBody);
+  } catch {
+    logger.warn({ sourceId }, 'Webhook rejected: Malformed JSON body despite valid signature');
+    return res.status(400).json({ error: 'Malformed request body' });
+  }
+
   try {
     if (event.event === 'payment.failed') {
       await handleFail(source.id, source.userId, event);

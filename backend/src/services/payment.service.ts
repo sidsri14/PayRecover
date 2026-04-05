@@ -1,6 +1,9 @@
 import { Prisma } from '@prisma/client';
+import pino from 'pino';
 import { prisma } from '../utils/prisma.js';
 import { logAuditAction } from './audit.service.js';
+
+const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
 
 export type FailedPaymentWithLinks = Prisma.FailedPaymentGetPayload<{
   include: { recoveryLinks: { orderBy: { createdAt: 'desc' }, take: 1 } }
@@ -158,7 +161,7 @@ export const getPaymentMetrics = async (userId: string) => {
       counts: Object.fromEntries(Object.entries(stats).map(([k, v]) => [k, v.count])),
     };
   } catch (err) {
-    console.error('Metrics Error:', err);
+    logger.error({ err }, 'Failed to compute payment metrics');
     return { ...ZERO_METRICS, counts: {} };
   }
 };
