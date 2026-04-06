@@ -31,3 +31,15 @@ export const simulateFailure = async (req: AuthRequest, res: Response, next: Nex
     successResponse(res, { message: 'Demo payment created', payment: p }, 201);
   } catch (err) { next(err); }
 };
+
+export const simulateSuccess = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const p = await prisma.failedPayment.update({
+      where: { id: id as string, userId: req.userId! },
+      data: { status: 'recovered', recoveredAt: new Date(), recoveredVia: 'link' }
+    });
+    await logAuditAction(req.userId!, 'DEMO_SUCCESS_SIMULATED', 'FailedPayment', p.id);
+    successResponse(res, { message: 'Demo success simulated', payment: p });
+  } catch (err) { next(err); }
+};

@@ -322,7 +322,7 @@ function App() {
               user ? (
                 <Layout user={user} onLogout={handleLogout}>
                   <Routes>
-                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/dashboard" element={<Dashboard user={user} />} />
                     <Route path="/payments/:id" element={<PaymentDetails />} />
                     <Route path="/sources" element={<Sources />} />
                     <Route path="/settings" element={<Settings user={user} onUpdateUser={(u) => setUser(u)} />} />

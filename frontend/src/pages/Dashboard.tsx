@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Search, RefreshCw, IndianRupee, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../utils/cn';
@@ -31,9 +32,23 @@ const SkeletonRow = () => (
   </div>
 );
 
-const Dashboard: React.FC = () => {
+const Dashboard: React.FC<{ user: any }> = ({ user }) => {
   const navigate = useNavigate();
-  const { state, setters, data, mutations } = useDashboardData();
+  const { state, setters, data, mutations } = useDashboardData(user);
+  const queryClient = useQueryClient();
+
+  // Re-fetch everything when the window gains focus or component mounts to ensure sync.
+  React.useEffect(() => {
+    const handleFocus = () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['sources'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+    };
+    
+    handleFocus(); // Initial mount refresh
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [queryClient]);
 
   const { search, statusFilter, sortKey, sortDir, showUpgradeModal, lastFetchedAt, page } = state;
   const { setSearch, setStatusFilter, setSortKey, setSortDir, setShowUpgradeModal, setPage } = setters;

@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 
 export const PAGE_SIZE = 10;
 
-export function useDashboardData() {
+export function useDashboardData(currentUser: any) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -21,17 +21,9 @@ export function useDashboardData() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // ── User / Plan
-  const { data: user } = useQuery({
-    queryKey: ['user'],
-    queryFn: async () => {
-      const { data } = await api.get('/auth/me');
-      return data.data;
-    },
-    staleTime: Infinity,
-  });
-  const isPaid = user?.plan === 'starter' || user?.plan === 'pro';
-  const plan = user?.plan || 'free';
+  // ── Plan logic derived from prop
+  const isPaid = currentUser?.plan === 'starter' || currentUser?.plan === 'pro';
+  const plan = currentUser?.plan || 'free';
 
   // ── Stats
   const { data: stats, isFetching: statsFetching } = useQuery({
@@ -42,7 +34,7 @@ export function useDashboardData() {
       return data.data;
     },
     refetchInterval: 30000,
-    staleTime: 10000,
+    staleTime: 5000, // Reduced for better reactivity
   });
 
   // ── Sources
@@ -52,7 +44,7 @@ export function useDashboardData() {
       const { data } = await api.get('/sources');
       return data.data;
     },
-    staleTime: 60000,
+    staleTime: 5000, // Reduced for better reactivity
   });
 
   // ── Payments (paginated)
@@ -72,7 +64,7 @@ export function useDashboardData() {
       return data.data;
     },
     refetchInterval: 30000,
-    staleTime: 10000,
+    staleTime: 5000,
   });
 
   // ── Mutations
@@ -81,7 +73,8 @@ export function useDashboardData() {
     onSuccess: () => {
       toast.success('Pro plan activated!');
       setShowUpgradeModal(false);
-      queryClient.invalidateQueries({ queryKey: ['user'] });
+      // We don't invalidate 'user' here anymore as it's passed from App.tsx via onUpdateUser
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     },
     onError: () => toast.error('Upgrade failed'),
   });
@@ -113,7 +106,7 @@ export function useDashboardData() {
   return {
     state: { page, search, statusFilter, sortKey, sortDir, showUpgradeModal, lastFetchedAt },
     setters: { setPage, setSearch, setStatusFilter, setSortKey, setSortDir, setShowUpgradeModal },
-    data: { user, isPaid, plan, stats, statsFetching, sources, paymentsPage, isLoading, isFetching },
+    data: { user: currentUser, isPaid, plan, stats, statsFetching, sources, paymentsPage, isLoading, isFetching },
     mutations: { upgradeMutation, retryMutation, simulateFailureMutation }
   };
 }
