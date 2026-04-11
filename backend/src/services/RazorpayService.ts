@@ -1,11 +1,20 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
-// Initialize with environment variables
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || '',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || '',
-});
+// Singleton instance for the Razorpay SDK
+let _razorpay: Razorpay | null = null;
+
+function getRazorpay(): Razorpay {
+  if (!_razorpay) {
+    const key_id = process.env.RAZORPAY_KEY_ID || '';
+    const key_secret = process.env.RAZORPAY_KEY_SECRET || '';
+    if (!key_id) {
+       console.warn('[Razorpay] RAZORPAY_KEY_ID is missing. SDK will fail on first request.');
+    }
+    _razorpay = new Razorpay({ key_id, key_secret });
+  }
+  return _razorpay;
+}
 
 /**
  * Service for interacting with Razorpay API and verifying webhooks.
@@ -38,7 +47,7 @@ export class RazorpayService {
     // Expiration: 7 days from now (in seconds)
     const expireBy = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
 
-    const link = await (razorpay.paymentLink.create({
+    const link = await (getRazorpay().paymentLink.create({
       amount: failedPayment.amount,           // already in paise
       currency: failedPayment.currency || 'INR',
       description: `Recover failed payment #${failedPayment.paymentId}`,
@@ -63,6 +72,6 @@ export class RazorpayService {
    * This is used for 'PayRecover Starter' and 'PayRecover Pro' billing.
    */
   static async createRazorpaySubscription(data: any) {
-    return (razorpay.subscriptions.create(data) as Promise<any>);
+    return (getRazorpay().subscriptions.create(data) as Promise<any>);
   }
 }
