@@ -32,43 +32,12 @@ logger.info({ rawAllowed, parsedAllowed }, 'CORS Configuration Initialized');
 // Enable trust proxy for correct IP detection in cloud environments
 app.set('trust proxy', 1);
 
-// 1. CORS Middleware (Using official package for robust preflight handling)
-app.use(cors({
-  origin: (origin, callback) => {
-    // Automatically allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
+// 1. Permissive CORS (Diagnostic Mode)
+app.use(cors()); // Allow everything temporarily to bypass blockage
 
-    const whitelist = [...parsedAllowed, 'http://localhost:5173'];
-    const isAllowed = whitelist.includes(origin) || origin.endsWith('.vercel.app');
-    
-    // Log the match result for debugging
-    if (!isAllowed) {
-      logger.warn({ origin, whitelist }, 'CORS Blocked');
-      return callback(new Error(`Origin ${origin} not allowed by CORS`));
-    }
-    
-    callback(null, true);
-  },
-  credentials: true,
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
-}));
+// 2. Security Middleware (Temporarily Minimal)
+app.use(helmet({ contentSecurityPolicy: false })); 
 
-// 2. Security Middleware
-app.use(helmet({
-  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", "https://pay-recover-web-production.up.railway.app", "https://pay-recover.vercel.app"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
-    },
-  },
-}));
 app.use(morgan('dev'));
 app.use(cookieParser());
 

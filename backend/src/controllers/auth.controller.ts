@@ -4,7 +4,14 @@ import { registerUser, loginUser, verifyUserEmail, requestPassReset, completePas
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import { prisma } from '../utils/prisma.js';
 
-const COOKIE_OPS = { httpOnly: true, secure: process.env.NODE_ENV !== 'development', sameSite: 'strict' as const, path: '/', maxAge: 7 * 24 * 3600000 };
+const isProd = process.env.NODE_ENV === 'production';
+const COOKIE_OPS = { 
+  httpOnly: true, 
+  secure: isProd, 
+  sameSite: (isProd ? 'none' : 'strict') as const, 
+  path: '/', 
+  maxAge: 7 * 24 * 3600000 
+};
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
