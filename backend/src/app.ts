@@ -43,7 +43,18 @@ app.use(helmet({
   },
 }));
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || ['http://localhost:5173'],
+  origin: (origin, callback) => {
+    const allowed = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || ['http://localhost:5173'];
+    console.log(`[CORS DEBUG] Request Origin: ${origin}`);
+    console.log(`[CORS DEBUG] Allowed Origins: ${JSON.stringify(allowed)}`);
+    
+    if (!origin || allowed.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.error(`[CORS FAIL] Origin ${origin} not in allowed list: ${JSON.stringify(allowed)}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(morgan('dev'));

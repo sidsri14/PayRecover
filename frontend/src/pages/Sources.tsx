@@ -158,7 +158,7 @@ const ConnectForm: FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
-const Sources: React.FC = () => {
+const Sources: FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [sourceToDelete, setSourceToDelete] = useState<string | null>(null);
   const queryClient = useQueryClient();
