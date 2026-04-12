@@ -5,7 +5,6 @@ import pino from 'pino';
 
 const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
 import type { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
@@ -26,23 +25,27 @@ const app = express();
 // Enable trust proxy for correct IP detection in cloud environments
 app.set('trust proxy', 1);
 
-// 1. CORS Middleware (Must be at the very top for preflight requests)
-app.use(cors({
-  origin: (origin, callback) => {
-    const allowed = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim());
-    // Auto-allow localhost and the configured production sites
-    const whitelist = [...allowed, 'http://localhost:5173'];
+// 1. CORS Middleware — explicit manual implementation; no silent failures
+const CORS_ORIGINS = new Set<string>([
+  'http://localhost:5173',
+  ...(process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean),
+]);
 
-    if (!origin || whitelist.includes(origin) || origin.endsWith('.vercel.app')) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS blocked for origin: ${origin}`));
-    }
-  },
-  credentials: true,
-  optionsSuccessStatus: 200,
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token'],
-}));
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  if (origin && (CORS_ORIGINS.has(origin) || origin.endsWith('.vercel.app'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-csrf-token');
+    res.setHeader('Vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
 
 // 2. Security Middleware
 app.use(helmet({
