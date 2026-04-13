@@ -34,6 +34,47 @@ const Settings: FC<Props> = ({ user, onUpdateUser }) => {
     }
   };
 
+  const handleUpgradeToPro = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.post('/billing/create-subscription', { plan: 'pro' });
+      if (!data.success) throw new Error(data.error || 'Failed to create subscription');
+
+      const { subscriptionId, shortUrl: _shortUrl } = data.data;
+
+      // Open Razorpay checkout modal
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || '',
+        subscription_id: subscriptionId,
+        name: 'PayRecover',
+        description: 'Pro Recovery Plan — ₹1,499/mo',
+        handler: (_response: any) => {
+          toast.success('Subscription activated! Your plan will update shortly.');
+          // Re-fetch user after a short delay to pick up the webhook-updated plan
+          setTimeout(() => window.location.reload(), 2000);
+        },
+        prefill: {
+          email: user.email,
+          name: user.name || '',
+        },
+        theme: { color: '#059669' },
+        modal: {
+          ondismiss: () => {
+            toast('Subscription cancelled.', { icon: 'ℹ️' });
+            setLoading(false);
+          },
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || err.message || 'Failed to start checkout');
+      setLoading(false);
+    }
+    // Note: setLoading(false) is handled by modal dismiss or page reload on success
+  };
+
   const handleUpdateProfile = async (e: FormEvent) => {
     e.preventDefault();
     setProfileLoading(true);
@@ -137,7 +178,7 @@ const Settings: FC<Props> = ({ user, onUpdateUser }) => {
               <li className="flex items-center gap-2 text-sm text-stone-700 dark:text-stone-200 font-medium"><Check className="w-4 h-4 text-emerald-500" /> Custom branding (coming soon)</li>
             </ul>
             {user.plan === 'free' ? (
-              <button onClick={() => handleUpdatePlan('pro')} disabled={loading} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
+              <button onClick={handleUpgradeToPro} disabled={loading} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-4 h-4" /> Upgrade to Pro</>}
               </button>
             ) : (
