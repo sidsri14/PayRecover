@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import toast from 'react-hot-toast';
 import { ShieldPlus, Mail, Lock, UserPlus, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
@@ -25,6 +25,8 @@ const Register: React.FC<Props> = ({ onRegisterSuccess }) => {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const oauthError = searchParams.get('error') === 'oauth_failed';
 
   const allRulesMet = PASSWORD_RULES.every(r => r.test(password));
 
@@ -75,6 +77,13 @@ const Register: React.FC<Props> = ({ onRegisterSuccess }) => {
           <p className="text-center text-stone-400 mb-8 font-medium text-sm">
             Create your account to get started.
           </p>
+
+          {oauthError && (
+            <div role="alert" className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl mb-6 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300 leading-tight">Google sign-in failed. Please try again or use email and password.</p>
+            </div>
+          )}
 
           {error && (
             <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl mb-6 flex items-start gap-3 animate-shake">
