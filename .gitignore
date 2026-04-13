@@ -1,3 +1,6 @@
+# Worktrees
+.worktrees/
+
 # IDEs
 .vscode/
 .idea/
