@@ -16,6 +16,9 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const PaymentStatus = lazy(() => import('./pages/PaymentStatus'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Contact = lazy(() => import('./pages/Contact'));
 
 export type AuthUser = {
   id: string;
@@ -243,6 +246,9 @@ function PageTitle() {
       '/reset-password': 'New Password | PayRecover',
       '/verify-email': 'Verify Account | PayRecover',
       '/payment-status': 'Payment Status | PayRecover',
+      '/privacy': 'Privacy Policy | PayRecover',
+      '/terms': 'Terms of Service | PayRecover',
+      '/contact': 'Contact | PayRecover',
     };
     document.title = titles[location.pathname] || 'PayRecover | Failed Payment Recovery';
   }, [location.pathname]);
@@ -316,6 +322,9 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/payment-status" element={<PaymentStatus />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/contact" element={<Contact />} />
 
             {/* Protected Routes */}
             <Route path="/*" element={
