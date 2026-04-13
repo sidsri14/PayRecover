@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, logout, getMe, verifyEmail, requestPasswordReset, resetPassword, updateProfile, updatePassword } from '../controllers/auth.controller.js';
+import { register, login, logout, getMe, verifyEmail, requestPasswordReset, resetPassword, updateProfile, updatePassword, googleAuth, googleCallback } from '../controllers/auth.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { csrfCheck } from '../middleware/csrf.middleware.js';
 import { validateRequest } from '../middleware/validate.middleware.js';
@@ -21,5 +21,9 @@ router.get('/me', requireAuth, getMe);
 // Protected update routes
 router.patch('/profile', requireAuth, csrfCheck, updateProfile);
 router.patch('/password', requireAuth, csrfCheck, updatePassword);
+
+// Google OAuth — no CSRF needed (OAuth state parameter handles CSRF protection)
+router.get('/google', googleAuth);
+router.get('/google/callback', ...googleCallback);
 
 export default router;

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import express from 'express';
+import passport from 'passport';
 import pino from 'pino';
 
 const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
@@ -67,6 +68,7 @@ app.use(helmet({
 
 app.use(morgan('dev'));
 app.use(cookieParser());
+app.use(passport.initialize());
 
 // Webhook routes need raw body for signature verification
 app.use('/api/webhooks/razorpay', webhookRoutes);

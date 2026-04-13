@@ -1,8 +1,11 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
 import { registerUser, loginUser, verifyUserEmail, requestPassReset, completePassReset, updateUserProfile, changeUserPassword } from '../services/auth.service.js';
+import { findOrCreateGoogleUser } from '../services/google-auth.service.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import { prisma } from '../utils/prisma.js';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 
 const isProd = process.env.NODE_ENV === 'production';
 const COOKIE_OPS = { 
@@ -94,11 +97,45 @@ export const updatePassword = async (req: AuthRequest, res: Response, next: Next
 
 export const getMe = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const u = await prisma.user.findUnique({ 
-      where: { id: req.userId }, 
-      select: { id: true, email: true, name: true, plan: true, createdAt: true } 
+    const u = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { id: true, email: true, name: true, plan: true, createdAt: true }
     });
     if (!u) return errorResponse(res, 'User not found', 404);
     successResponse(res, u);
   } catch (err) { next(err); }
 };
+
+// Configure Google OAuth strategy (executed once at module load time)
+passport.use(new GoogleStrategy(
+  {
+    clientID: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback',
+  },
+  async (_accessToken, _refreshToken, profile, done) => {
+    try {
+      const result = await findOrCreateGoogleUser(profile);
+      done(null, result);
+    } catch (err) {
+      done(err as Error);
+    }
+  }
+));
+
+export const googleAuth = passport.authenticate('google', {
+  scope: ['profile', 'email'],
+  session: false,
+});
+
+export const googleCallback = [
+  passport.authenticate('google', {
+    session: false,
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=google_failed`,
+  }),
+  (req: any, res: Response) => {
+    const { token } = req.user as { user: any; token: string };
+    res.cookie('token', token, COOKIE_OPS);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`);
+  },
+];
