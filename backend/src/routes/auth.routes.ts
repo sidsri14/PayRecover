@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { register, login, logout, getMe, verifyEmail, requestPasswordReset, resetPassword, updateProfile, updatePassword, googleAuthCallback } from '../controllers/auth.controller.js';
+import { register, login, logout, getMe, verifyEmail, requestPasswordReset, resetPassword, updateProfile, updatePassword, googleAuthCallback, setPassword } from '../controllers/auth.controller.js';
 import passport from 'passport';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { csrfCheck } from '../middleware/csrf.middleware.js';
 import { validateRequest } from '../middleware/validate.middleware.js';
-import { registerSchema, loginSchema } from '../validators/auth.validator.js';
+import { registerSchema, loginSchema, setPasswordSchema } from '../validators/auth.validator.js';
 import { authLimiter } from '../middleware/rateLimit.middleware.js';
 
 const router = Router();
@@ -27,5 +27,6 @@ router.get('/me', requireAuth, getMe);
 // Protected update routes
 router.patch('/profile', requireAuth, csrfCheck, updateProfile);
 router.patch('/password', requireAuth, csrfCheck, updatePassword);
+router.patch('/set-password', requireAuth, csrfCheck, validateRequest(setPasswordSchema), setPassword);
 
 export default router;
