@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { api } from '../api';
+import { Link, useSearchParams } from 'react-router-dom';
+import { api, API_URL } from '../api';
 import toast from 'react-hot-toast';
 import { ShieldAlert, Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
 import type { AuthUser } from '../App';
@@ -14,6 +14,8 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const oauthError = searchParams.get('error') === 'oauth_failed';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +52,13 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
           </div>
 
           <h2 className="text-lg font-semibold text-center mb-8 text-stone-600 dark:text-stone-300">Sign In</h2>
+
+          {oauthError && (
+            <div role="alert" className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl mb-6 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300 leading-tight">Google sign-in failed. Please try again or use email and password.</p>
+            </div>
+          )}
 
           {error && (
             <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl mb-6 flex items-start gap-3 animate-shake">
@@ -125,7 +134,7 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
           </div>
 
           <button
-            onClick={() => window.location.href = import.meta.env.VITE_API_URL + '/auth/google'}
+            onClick={() => window.location.href = API_URL + '/auth/google'}
             className="w-full bg-white dark:bg-stone-800 border border-warm-border dark:border-stone-600 hover:bg-stone-50 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 font-semibold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">

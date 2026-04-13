@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 
 import { Moon, Sun, LogOut, TrendingUp, Link2, Loader2, Settings as SettingsIcon, Menu, X } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
@@ -26,6 +26,8 @@ export type AuthUser = {
   name?: string;
   plan: 'free' | 'starter' | 'pro';
   createdAt: string;
+  hasPassword: boolean;
+  googleLinked: boolean;
 };
 
 const PageLoader = () => (
