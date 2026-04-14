@@ -11,6 +11,7 @@ export const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req: Request) => (req.headers['x-forwarded-for'] as string) ?? req.socket.remoteAddress ?? 'unknown',
 });
 
 export const apiLimiter = rateLimit({
@@ -22,6 +23,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req: Request) => (req.headers['x-forwarded-for'] as string) ?? req.socket.remoteAddress ?? 'unknown',
 });
 
 // ── Plan-aware rate limiters (keyed by userId, not IP) ────────────────────────
@@ -49,7 +51,9 @@ const planLimiters = Object.fromEntries(
       message: { success: false, error: 'Rate limit exceeded. Please slow down.' },
       standardHeaders: true,
       legacyHeaders: false,
-      keyGenerator: (req: Request) => (req as AuthRequest).userId ?? req.ip ?? 'unknown',
+      keyGenerator: (req: Request) => {
+        return (req as AuthRequest).userId ?? (req.headers['x-forwarded-for'] as string) ?? req.socket.remoteAddress ?? 'unknown';
+      },
     }),
   ])
 );
