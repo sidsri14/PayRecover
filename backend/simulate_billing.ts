@@ -1,10 +1,16 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 import axios from 'axios';
 
 const prisma = new PrismaClient();
-const WEBHOOK_SECRET = 'xxxx'; // from .env
+const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 const API_URL = 'http://127.0.0.1:3000/api/billing/webhook';
+
+if (!WEBHOOK_SECRET) {
+  console.error('Error: RAZORPAY_WEBHOOK_SECRET is not set in .env');
+  process.exit(1);
+}
 
 async function run() {
   try {
@@ -47,7 +53,7 @@ async function run() {
       }
     });
 
-    const signature = crypto.createHmac('sha256', WEBHOOK_SECRET).update(payload).digest('hex');
+    const signature = crypto.createHmac('sha256', WEBHOOK_SECRET!).update(payload).digest('hex');
 
     const res = await axios.post(API_URL, payload, {
       headers: {
