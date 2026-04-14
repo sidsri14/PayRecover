@@ -100,6 +100,7 @@ const runAbandonCleanup = async (): Promise<void> => {
 const shutdown = async (signal: string): Promise<void> => {
   logger.info(`Shutting down worker (${signal})`);
   if (abandonHandle) clearTimeout(abandonHandle);
+  if (heartbeatHandle) clearInterval(heartbeatHandle);
   await recoveryWorker.close();
   workerConnection.disconnect();
   await prisma.$disconnect();
@@ -109,10 +110,26 @@ const shutdown = async (signal: string): Promise<void> => {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
+// ── Worker Heartbeat ──────────────────────────────────────────────────────────
+// Writes a timestamp to Redis every 60 s with a 150 s TTL.
+// The health endpoint reads this key — if absent/stale, the worker is down.
+
+const HEARTBEAT_KEY = 'payrecover:worker:heartbeat';
+const HEARTBEAT_INTERVAL_MS = 60_000;
+
+const writeHeartbeat = () =>
+  workerConnection
+    .set(HEARTBEAT_KEY, Date.now().toString(), 'EX', 150)
+    .catch(err => logger.error(err, '[Heartbeat] Failed to write'));
+
+let heartbeatHandle: ReturnType<typeof setInterval> | null = null;
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 logger.info('PayRecover Worker — started (BullMQ + Redis)');
 runAbandonCleanup();
+writeHeartbeat();
+heartbeatHandle = setInterval(writeHeartbeat, HEARTBEAT_INTERVAL_MS);
 
 // Register daily PII-prune repeatable job (idempotent — BullMQ deduplicates by jobId).
 enqueuePrunePiiJob().catch(err =>

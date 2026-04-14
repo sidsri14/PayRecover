@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Search, RefreshCw, IndianRupee, AlertTriangle, Download } from 'lucide-react';
 import { api } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,6 +17,35 @@ import { OnboardingChecklist } from '../components/dashboard/OnboardingChecklist
 import { DashboardStats } from '../components/dashboard/DashboardStats';
 import { PaymentRow } from '../components/dashboard/PaymentRow';
 import { useDashboardData } from '../components/dashboard/useDashboardData';
+
+// ── Worker Status Badge
+const WorkerStatusBadge: FC = () => {
+  const { data } = useQuery({
+    queryKey: ['queue-stats'],
+    queryFn: async () => {
+      const { data } = await api.get('/queue/stats');
+      return data.data as { worker: { status: string; lastSeenMs: number | null } };
+    },
+    refetchInterval: 60_000,
+    retry: false,
+  });
+
+  const status = data?.worker?.status ?? 'unknown';
+  const cfg: Record<string, { label: string; dot: string; text: string }> = {
+    online:  { label: 'Worker Online',  dot: 'bg-emerald-500 animate-pulse', text: 'text-emerald-600 dark:text-emerald-400' },
+    stale:   { label: 'Worker Stale',   dot: 'bg-amber-400',                  text: 'text-amber-600 dark:text-amber-400' },
+    offline: { label: 'Worker Offline', dot: 'bg-rose-500',                   text: 'text-rose-600 dark:text-rose-400' },
+    unknown: { label: 'Worker Unknown', dot: 'bg-stone-400',                   text: 'text-stone-400' },
+  };
+  const { label, dot, text } = cfg[status] ?? cfg.unknown;
+
+  return (
+    <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${text}`}>
+      <span className={`w-2 h-2 rounded-full ${dot}`} />
+      {label}
+    </span>
+  );
+};
 
 // ── Skeletons
 const SkeletonCard = () => (
@@ -117,6 +146,7 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
             {(isFetching || statsFetching) && (
               <RefreshCw className="w-4 h-4 text-stone-400 animate-spin" />
             )}
+            <WorkerStatusBadge />
             <MonitoringBadge lastFetchedAt={lastFetchedAt} isFetching={isFetching || statsFetching} />
           </div>
         </div>

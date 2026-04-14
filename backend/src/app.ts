@@ -20,6 +20,7 @@ import sourceRoutes from './routes/source.routes.js';
 import recoveryRoutes from './routes/recovery.routes.js';
 import webhookEndpointRoutes from './routes/webhookEndpoints.routes.js';
 import apiKeyRoutes from './routes/apiKeys.routes.js';
+import { Queue } from 'bullmq';
 import { billingWebhook, stripeBillingWebhook } from './controllers/billing.controller.js';
 import { prisma } from './utils/prisma.js';
 import { redisConnection } from './jobs/recovery.queue.js';
@@ -115,8 +116,11 @@ app.get('/api/csrf-token', (_req, res) => {
 });
 
 // Health Check
+const HEARTBEAT_KEY = 'payrecover:worker:heartbeat';
+const WORKER_STALE_MS = 150_000; // matches worker TTL
+
 app.get('/health', async (_req, res) => {
-  const checks = { database: 'unknown', redis: 'unknown', razorpay: 'unknown' };
+  const checks: Record<string, string> = { database: 'unknown', redis: 'unknown', razorpay: 'unknown', worker: 'unknown' };
   let healthy = true;
 
   try {
@@ -130,8 +134,20 @@ app.get('/health', async (_req, res) => {
   try {
     await redisConnection.ping();
     checks.redis = 'connected';
+
+    // Worker heartbeat check
+    const hb = await redisConnection.get(HEARTBEAT_KEY);
+    if (!hb) {
+      checks.worker = 'offline';
+      healthy = false;
+    } else {
+      const age = Date.now() - parseInt(hb, 10);
+      checks.worker = age < WORKER_STALE_MS ? 'online' : 'stale';
+      if (checks.worker !== 'online') healthy = false;
+    }
   } catch {
     checks.redis = 'disconnected';
+    checks.worker = 'unknown';
     healthy = false;
   }
 
@@ -145,6 +161,35 @@ app.get('/health', async (_req, res) => {
     timestamp: new Date().toISOString(),
     ...checks,
   });
+});
+
+// Queue Stats (authenticated — for dashboard use)
+app.get('/api/queue/stats', async (req, res) => {
+  // Lightweight auth: check cookie or x-api-key (reuse requireAuth inline)
+  const token = req.cookies?.token;
+  const apiKeyHeader = req.headers['x-api-key'] as string | undefined;
+  if (!token && !apiKeyHeader) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  try {
+    const queue = new Queue('payment-recovery', { connection: redisConnection });
+    const counts = await queue.getJobCounts('waiting', 'active', 'failed', 'delayed', 'completed');
+    const hb = await redisConnection.get(HEARTBEAT_KEY);
+    const workerAge = hb ? Date.now() - parseInt(hb, 10) : null;
+    await queue.close();
+    res.json({
+      success: true,
+      data: {
+        queue: counts,
+        worker: {
+          status: !hb ? 'offline' : workerAge! < WORKER_STALE_MS ? 'online' : 'stale',
+          lastSeenMs: workerAge,
+        },
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: 'Failed to read queue stats' });
+  }
 });
 
 // Routes
