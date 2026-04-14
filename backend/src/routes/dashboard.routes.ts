@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { getDashboardStats, getMetrics } from '../controllers/dashboard.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
-import { apiLimiter } from '../middleware/rateLimit.middleware.js';
+import { planAwareLimiter } from '../middleware/rateLimit.middleware.js';
 
 const router = Router();
 
 router.use(requireAuth);
-router.use(apiLimiter);
+router.use(planAwareLimiter);
 
 router.get('/stats', getDashboardStats);
 router.get('/metrics', getMetrics);

@@ -113,6 +113,19 @@ const handleFail = async (srcId: string, uId: string, data: any) => {
 };
 
 const handleCapture = async (uId: string, data: any) => {
+  // Priority 1: Direct link from adapter metadata (e.g. Stripe failedPaymentId)
+  if (data.failedPaymentId) {
+    const f = await prisma.failedPayment.findUnique({ 
+      where: { id: data.failedPaymentId, userId: uId } 
+    });
+    if (f && ['pending', 'retrying'].includes(f.status)) {
+      await markPaymentRecovered(f.id, uId);
+      await logAuditAction(uId, 'PAYMENT_RECOVERED', 'FailedPayment', f.id, { recoveredId: data.paymentId, method: 'metadata' });
+      return;
+    }
+  }
+
+  // Priority 2: Match by IDs (Razorpay/Generic fallback)
   const f = await prisma.failedPayment.findFirst({ 
     where: { 
       userId: uId, 
@@ -127,5 +140,5 @@ const handleCapture = async (uId: string, data: any) => {
   if (!f) return;
 
   await markPaymentRecovered(f.id, uId);
-  await logAuditAction(uId, 'PAYMENT_RECOVERED', 'FailedPayment', f.id, { recoveredId: data.paymentId });
+  await logAuditAction(uId, 'PAYMENT_RECOVERED', 'FailedPayment', f.id, { recoveredId: data.paymentId, method: 'matching' });
 };

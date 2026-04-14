@@ -48,6 +48,7 @@ model Subscription {
   updatedAt           DateTime @updatedAt
 
   @@index([userId])
+  @@unique([userId, status])
 }
 
 model PaymentSource {
@@ -143,8 +144,8 @@ model Reminder {
 
 model AuditLog {
   id         String   @id @default(uuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   action     String
   resource   String?
   resourceId String?
@@ -157,7 +158,7 @@ model AuditLog {
 
 model Organization {
   id          String       @id @default(uuid())
-  name        String
+  name        String       @db.VarChar(100)
   members     Membership[]
   sources     PaymentSource[]
   createdAt   DateTime     @default(now())

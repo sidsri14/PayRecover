@@ -19,6 +19,16 @@ export const trackClick = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Recovery link not found' });
     }
 
+    // 0. Check Expiration
+    const link = payment.recoveryLinks[0];
+    if (link.expiresAt && link.expiresAt < new Date()) {
+      await logAuditAction(payment.userId, 'EXPIRED_LINK_CLICKED', 'FailedPayment', failedPaymentId, { 
+        email: payment.customerEmail,
+        expiredAt: link.expiresAt 
+      });
+      return res.status(410).json({ error: 'Recovery link has expired' });
+    }
+
     // 1. Gather Analytics Metadata
     const userAgentRaw = req.headers['user-agent'];
     const userAgent = Array.isArray(userAgentRaw) ? userAgentRaw[0] : (userAgentRaw || 'Unknown');

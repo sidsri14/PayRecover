@@ -63,10 +63,16 @@ export class StripeProvider extends BaseProvider {
   }
 
   async verifyWebhookSignature(body: any, signature: string, webhookSecret: string): Promise<boolean> {
-    // Note: Stripe verification requires the raw body and the secret.
-    // The implementation will likely happen in the controller using the stripe SDK directly
-    // since we need the `stripe` instance initialized with the CORRECT key from the source.
-    return true; // Verification logic moved to controller/adapter helper
+    try {
+      // Stripe verification needs the raw body (string) and the secret.
+      // We use a dummy key because constructEvent is a static-like utility on the instance.
+      const stripe = new Stripe('dummy', { apiVersion: '2023-10-16' as any });
+      stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      return true;
+    } catch (err) {
+      console.error('[StripeProvider] Webhook signature verification failed:', err);
+      return false;
+    }
   }
 
   parseWebhook(body: any): PaymentEventData | null {
@@ -96,6 +102,7 @@ export class StripeProvider extends BaseProvider {
           providerEventId: event.id,
           eventType: 'payment.captured',
           paymentId: data.id,
+          failedPaymentId: data.metadata?.failedPaymentId, // Essential for recovery tracking
           amount: data.amount || data.amount_total,
           currency: data.currency,
           customerEmail: data.receipt_email || data.customer_details?.email || data.customer_email,

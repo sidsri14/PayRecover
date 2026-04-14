@@ -4,7 +4,7 @@ import { prisma } from '../utils/prisma.js';
  * Logs an action to the persistent audit trail.
  */
 export const logAuditAction = async (
-  userId: string,
+  userId: string | null,
   action: string,
   resource: string | null = null,
   resourceId: string | null = null,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 
 import { Moon, Sun, LogOut, TrendingUp, Link2, Loader2, Settings as SettingsIcon, Menu, X, Users } from 'lucide-react';
@@ -224,33 +225,7 @@ const Layout: React.FC<React.PropsWithChildren<LayoutProps>> = ({ children, user
   );
 };
 
-// ── Error Boundary
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() { return { hasError: true }; }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-cream dark:bg-stone-900">
-          <div className="text-center space-y-4">
-            <h2 className="text-2xl font-black text-stone-800 dark:text-stone-100">Something went wrong.</h2>
-            <p className="text-stone-500 dark:text-stone-400 text-sm">We've encountered an unexpected error.</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm"
-            >
-              Reload Dashboard
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+
 
 function PageTitle() {
   const location = useLocation();

@@ -7,11 +7,28 @@ const REQUIRED_ENV = [
   'JWT_SECRET', 'ENCRYPTION_KEY', 'DATABASE_URL',
   'RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET',
 ] as const;
+
+const OPTIONAL_ENV: Array<{ key: string; impact: string }> = [
+  { key: 'SMTP_HOST',          impact: 'Recovery emails will not be sent (console-only mode)' },
+  { key: 'TWILIO_SID',         impact: 'Pro-plan SMS recovery on 3rd attempt will be skipped' },
+  { key: 'TWILIO_AUTH_TOKEN',  impact: 'Pro-plan SMS recovery on 3rd attempt will be skipped' },
+  { key: 'TWILIO_FROM_NUMBER', impact: 'Pro-plan SMS recovery on 3rd attempt will be skipped' },
+];
+
 function validateEnv(): void {
   const missing = REQUIRED_ENV.filter(k => !process.env[k]);
   if (missing.length > 0) {
     console.error(`[Startup] Missing required environment variables: ${missing.join(', ')}`);
     process.exit(1);
+  }
+
+  // Warn about optional vars that degrade functionality
+  const missingOptional = OPTIONAL_ENV.filter(({ key }) => !process.env[key]);
+  if (missingOptional.length > 0) {
+    console.warn('[Startup] Optional environment variables not set:');
+    missingOptional.forEach(({ key, impact }) =>
+      console.warn(`  ⚠  ${key}: ${impact}`)
+    );
   }
 }
 validateEnv();

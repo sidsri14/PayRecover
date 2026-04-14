@@ -60,20 +60,27 @@ export const verifyUserEmail = async (token: string) => {
 
 export const requestPassReset = async (email: string) => {
   const u = await prisma.user.findUnique({ where: { email } });
-  if (!u) return { message: 'Check your email' };
+  
+  // Timing-safe response: Always act as if email was sent if address is valid format
+  // We avoid returning early to prevent timing enumeration
+  if (u) {
+    const rToken = crypto.randomBytes(32).toString('hex');
+    await prisma.user.update({ 
+      where: { id: u.id }, 
+      data: { passwordResetToken: rToken, passwordResetExpiry: new Date(Date.now() + RESET_EXPIRY_MINUTES * 60000) } 
+    });
 
-  const rToken = crypto.randomBytes(32).toString('hex');
-  await prisma.user.update({ 
-    where: { id: u.id }, 
-    data: { passwordResetToken: rToken, passwordResetExpiry: new Date(Date.now() + RESET_EXPIRY_MINUTES * 60000) } 
-  });
+    sendPasswordResetEmail(email, {
+      resetLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${rToken}`,
+      expiresInMinutes: RESET_EXPIRY_MINUTES,
+    }).catch(e => logger.error(e));
 
-  sendPasswordResetEmail(email, {
-    resetLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${rToken}`,
-    expiresInMinutes: RESET_EXPIRY_MINUTES,
-  }).catch(e => logger.error(e));
+    await logAuditAction(u.id, 'PASSWORD_RESET_REQUESTED', 'User', u.id);
+  } else {
+    // Dummy wait to simulate DB operations and email setup
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
 
-  await logAuditAction(u.id, 'PASSWORD_RESET_REQUESTED', 'User', u.id);
   return { message: 'Check your email' };
 };
 

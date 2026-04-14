@@ -11,13 +11,17 @@ const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: t
 export const simulateFailure = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const id = `pay_demo_${Math.random().toString(36).slice(7)}`;
+    // Look up real user for demo context
+    const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+    const email = user?.email || 'demo@example.com';
+
     const p = await prisma.failedPayment.create({
       data: {
         userId: req.userId!,
         paymentId: id,
         orderId: `order_${Math.random().toString(36).slice(7)}`,
-        customerName: 'Demo User',
-        customerEmail: 'demo@example.com',
+        customerName: user?.name || 'Demo User',
+        customerEmail: email,
         customerPhone: '+919999999999',
         amount: 49900,
         currency: 'INR',

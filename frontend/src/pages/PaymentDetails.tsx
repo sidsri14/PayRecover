@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
@@ -92,12 +92,21 @@ const PaymentDetails: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8"
     >
-      {/* ── Back link */}
+      {/* ── Breadcrumbs & Back */}
+      <nav className="flex items-center gap-2 text-xs font-semibold text-stone-400 uppercase tracking-widest mb-2">
+        <Link to="/" className="hover:text-emerald-600 transition-colors">Dashboard</Link>
+        <span className="text-stone-300">/</span>
+        <span className="text-stone-500">Payment Details</span>
+      </nav>
+
       <button
         onClick={() => navigate('/')}
-        className="flex items-center gap-2 text-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors font-medium"
+        className="group flex items-center gap-2 text-sm text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition-all font-bold"
       >
-        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+        <div className="p-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 group-hover:bg-stone-200 dark:group-hover:bg-stone-700 transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+        </div>
+        Back to Dashboard
       </button>
 
       {/* ── Header */}

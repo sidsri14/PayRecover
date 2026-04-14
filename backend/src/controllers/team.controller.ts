@@ -54,12 +54,21 @@ export const getOrgMembers = async (req: AuthRequest, res: Response, next: NextF
 
     if (!membership) return errorResponse(res, 'Access denied', 403);
 
-    const members = await prisma.membership.findMany({
-      where: { organizationId: orgId },
-      include: { user: { select: { id: true, email: true, name: true } } },
-    });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
 
-    successResponse(res, members);
+    const [members, total] = await Promise.all([
+      prisma.membership.findMany({
+        where: { organizationId: orgId },
+        include: { user: { select: { id: true, email: true, name: true } } },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.membership.count({ where: { organizationId: orgId } })
+    ]);
+
+    successResponse(res, { members, total, page, limit });
   } catch (err) { next(err); }
 };
 
@@ -91,11 +100,17 @@ export const inviteUser = async (req: AuthRequest, res: Response, next: NextFunc
     });
     if (existing) return errorResponse(res, 'User is already a member', 400);
 
+    // Validate Role
+    const allowedRoles = ['admin', 'member'];
+    if (!allowedRoles.includes(role)) {
+      return errorResponse(res, 'Invalid role. Allowed: admin, member', 400);
+    }
+
     const newMember = await prisma.membership.create({
       data: {
         userId: userToInvite.id,
         organizationId: orgId,
-        role: role as string,
+        role,
       }
     });
 

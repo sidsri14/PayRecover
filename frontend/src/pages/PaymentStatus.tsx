@@ -7,8 +7,10 @@ const PaymentStatus: React.FC = () => {
 
   const status = params.get('razorpay_payment_link_status'); // "paid" | "cancelled" | null
   const paymentId = params.get('razorpay_payment_id');
+  const sessionId = params.get('session_id'); // Stripe success indicator
 
-  const isSuccess = status === 'paid' && Boolean(paymentId);
+  const isSuccess = (status === 'paid' && Boolean(paymentId)) || Boolean(sessionId);
+  const displayId = paymentId || sessionId;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-cream dark:bg-stone-900 p-6 transition-colors">
@@ -34,9 +36,9 @@ const PaymentStatus: React.FC = () => {
                 Your payment has been received. You will get a confirmation shortly.
               </p>
             </div>
-            {paymentId && (
+            {displayId && (
               <p className="text-xs font-mono text-stone-400 dark:text-stone-500 bg-stone-50 dark:bg-stone-900/50 rounded-lg px-3 py-2 break-all">
-                Payment ID: {paymentId}
+                {paymentId ? 'Payment ID: ' : 'Session ID: '}{displayId}
               </p>
             )}
           </>

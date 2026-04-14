@@ -1,5 +1,8 @@
 import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
+import pino from 'pino';
+
+const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
 
 /**
  * Validates the double-submit CSRF pattern:
@@ -22,6 +25,23 @@ export const csrfCheck = (req: Request, res: Response, next: NextFunction): void
     crypto.timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken));
 
   if (!valid) {
+    // Distinguish missing token (likely a dev/tool mistake) from a wrong token
+    // (potential CSRF attack — client has a token but it doesn't match).
+    const reason = !cookieToken
+      ? 'missing_cookie'
+      : !headerToken
+        ? 'missing_header'
+        : 'token_mismatch';
+
+    logger.warn({
+      reason,
+      method: req.method,
+      path: req.path,
+      ip: req.ip,
+      origin: req.headers.origin,
+      userAgent: req.headers['user-agent'],
+    }, `CSRF validation failed: ${reason}`);
+
     res.status(403).json({ success: false, error: 'Invalid CSRF token' });
     return;
   }

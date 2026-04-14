@@ -3,6 +3,7 @@ export interface PaymentEventData {
   eventType: 'payment.failed' | 'payment.captured' | 'subscription.cancelled' | 'other';
   paymentId: string;
   orderId?: string;
+  failedPaymentId?: string; // Set by adapters that embed it in metadata (e.g. Stripe checkout)
   amount: number;
   currency: string;
   customerEmail: string;

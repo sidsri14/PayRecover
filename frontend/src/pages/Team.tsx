@@ -25,7 +25,7 @@ const Team = () => {
         const defaultOrg = orgData.data[0];
         setActiveOrg(defaultOrg);
         const { data: memberData } = await api.get(`/team/${defaultOrg.id}/members`);
-        setMembers(memberData.data);
+        setMembers(memberData.data.members); // Updated for paginated response structure
       }
     } catch (err) {
       toast.error('Failed to load team data');
@@ -214,6 +214,7 @@ const Team = () => {
                       required
                       value={newOrgName}
                       onChange={e => setNewOrgName(e.target.value)}
+                      maxLength={100}
                       placeholder="e.g. Acme Corp"
                       className="w-full px-5 py-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-transparent focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium text-stone-800 dark:text-stone-100"
                     />

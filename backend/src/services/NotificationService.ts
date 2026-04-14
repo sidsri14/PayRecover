@@ -19,6 +19,12 @@ export class NotificationService {
   static async dispatchRecovery(payment: any, trackingUrl: string): Promise<void> {
     const { retryCount, customerEmail, customerPhone, user } = payment;
     
+    // Check for potential delivery issues in production
+    if (process.env.NODE_ENV === 'production') {
+      if (!process.env.SMTP_HOST) logger.warn('[CRITICAL] SMTP_HOST not configured. Email recovery will FAIL.');
+      if (user?.plan === 'pro' && !process.env.TWILIO_SID) logger.warn('[CRITICAL] TWILIO_SID not configured. SMS recovery will FAIL for pro users.');
+    }
+
     // Always dispatch Email
     await EmailService.sendRecoveryEmail(payment, trackingUrl, retryCount);
     logger.info({ paymentId: payment.id, retryCount, channel: 'email' }, 'Dispatched Email Recovery');

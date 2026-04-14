@@ -51,14 +51,21 @@ export const exportPayments = async (req: AuthRequest, res: Response, next: Next
       include: { event: { include: { source: true } } },
     });
 
+    const escapeCSV = (str: string) => {
+      if (!str) return '""';
+      // Wrap in quotes and escape internal quotes by doubling them
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
     let csv = 'Date,Customer,Email,Amount,Currency,Source,Platform ID\n';
     payments.forEach(p => {
       const date = p.recoveredAt?.toISOString().split('T')[0] || p.createdAt.toISOString().split('T')[0];
-      const name = (p.customerName || 'N/A').replace(/,/g, '');
-      const email = p.customerEmail;
+      const name = escapeCSV(p.customerName || 'N/A');
+      const email = escapeCSV(p.customerEmail);
       const amt = (p.amount / 100).toFixed(2);
-      const source = (p.event?.source?.name || p.event?.source?.provider || 'N/A').replace(/,/g, '');
-      csv += `${date},${name},${email},${amt},${p.currency},${source},${p.paymentId}\n`;
+      const source = escapeCSV(p.event?.source?.name || p.event?.source?.provider || 'N/A');
+      const platformId = escapeCSV(p.paymentId);
+      csv += `${date},${name},${email},${amt},${p.currency},${source},${platformId}\n`;
     });
 
     res.setHeader('Content-Type', 'text/csv');
