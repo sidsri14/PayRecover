@@ -163,18 +163,19 @@ export const removeMember = async (req: AuthRequest, res: Response, next: NextFu
     });
     if (!requester) return errorResponse(res, 'Insufficient permissions', 403);
 
-    // Owner cannot remove themselves
-    if (targetUserId === req.userId && requester.role === 'owner') {
-      return errorResponse(res, 'Owner cannot remove themselves', 400);
-    }
-
+    // Target member must exist in this org
     const target = await prisma.membership.findFirst({
       where: { userId: targetUserId, organizationId: orgId },
     });
     if (!target) return errorResponse(res, 'Member not found', 404);
 
-    // Cannot remove an owner (unless they are removing themselves as non-owner)
-    if (target.role === 'owner' && targetUserId !== req.userId) {
+    // Owner cannot remove themselves
+    if (targetUserId === req.userId! && requester.role === 'owner') {
+      return errorResponse(res, 'Owner cannot remove themselves', 400);
+    }
+
+    // Cannot remove another owner
+    if (target.role === 'owner' && targetUserId !== req.userId!) {
       return errorResponse(res, 'Cannot remove organization owner', 403);
     }
 
