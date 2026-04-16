@@ -20,6 +20,8 @@ import sourceRoutes from './routes/source.routes.js';
 import recoveryRoutes from './routes/recovery.routes.js';
 import webhookEndpointRoutes from './routes/webhookEndpoints.routes.js';
 import apiKeyRoutes from './routes/apiKeys.routes.js';
+import auditRoutes from './routes/audit.routes.js';
+import contactRoutes from './routes/contact.routes.js';
 import { Queue } from 'bullmq';
 import { billingWebhook, stripeBillingWebhook } from './controllers/billing.controller.js';
 import { prisma } from './utils/prisma.js';
@@ -203,6 +205,8 @@ app.use('/api/sources', sourceRoutes);
 app.use('/api/recovery', recoveryRoutes);
 app.use('/api/webhook-endpoints', webhookEndpointRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
+app.use('/api/security', auditRoutes);
+app.use('/api/contact', contactRoutes);
 
 // Error Handling
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {

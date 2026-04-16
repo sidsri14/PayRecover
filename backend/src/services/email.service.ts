@@ -241,3 +241,27 @@ Powered by PayRecover`;
 
   await sendMail(to, subject, text);
 };
+
+// ── Email 5: Contact form submission ─────────────────────────────────────────
+
+export const sendContactEmail = async (params: {
+  name: string;
+  email: string;
+  message: string;
+}): Promise<void> => {
+  const to = process.env.SUPPORT_EMAIL;
+  if (!to) {
+    console.log('\n══════════════════════════════════════════════════');
+    console.log(`📧 [CONTACT FORM — SUPPORT_EMAIL not set, message not sent]`);
+    console.log(`From: ${params.name} <${params.email}>`);
+    console.log('──────────────────────────────────────────────────');
+    console.log(params.message);
+    console.log('══════════════════════════════════════════════════\n');
+    return;
+  }
+
+  const subject = `[PayRecover Contact] Message from ${params.name}`;
+  const text = `Name: ${params.name}\nEmail: ${params.email}\n\nMessage:\n${params.message}`;
+
+  await sendMail(to, subject, text);
+};
