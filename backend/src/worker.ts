@@ -31,6 +31,23 @@ const workerConnection = new IORedis(process.env.REDIS_URL || 'redis://localhost
   enableReadyCheck: false,
 });
 
+// Check Redis eviction policy — BullMQ requires "noeviction" or jobs may be silently dropped.
+// Upstash may reject CONFIG GET; treat that as a debug-level non-issue.
+async function checkRedisEvictionPolicy(): Promise<void> {
+  try {
+    const result = await workerConnection.config('GET', 'maxmemory-policy');
+    const policy = result[1] as string | undefined;
+    if (policy && policy !== 'noeviction') {
+      logger.warn(
+        `[Worker] Redis maxmemory-policy is "${policy}" — expected "noeviction". Jobs may be silently dropped! Fix in Upstash dashboard: Configuration → Eviction Policy → noeviction`
+      );
+    }
+  } catch {
+    logger.debug('[Worker] Could not read Redis maxmemory-policy (expected if using Upstash — CONFIG GET is restricted)');
+  }
+}
+void checkRedisEvictionPolicy();
+
 // ── BullMQ Worker ─────────────────────────────────────────────────────────────
 
 const recoveryWorker = new Worker(
