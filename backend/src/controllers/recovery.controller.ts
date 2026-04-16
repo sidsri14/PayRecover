@@ -44,6 +44,14 @@ export const trackClick = async (req: Request, res: Response) => {
       data: { clickCount: { increment: 1 } }
     });
 
+    // Set usedAt on the recovery link if this is the first click
+    if (!link.usedAt) {
+      await prisma.recoveryLink.update({
+        where: { id: link.id },
+        data: { usedAt: new Date() },
+      });
+    }
+
     // 3. Log detailed audit event
     await logAuditAction(payment.userId, 'PAYMENT_LINK_CLICKED', 'FailedPayment', failedPaymentId, { 
       email: payment.customerEmail,
