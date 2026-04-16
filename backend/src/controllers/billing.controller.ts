@@ -15,9 +15,6 @@ const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: t
 export const createSubscription = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { plan, gateway } = req.body; // "starter" or "pro", "razorpay" or "stripe"
-    if (!['starter', 'pro'].includes(plan)) {
-      return errorResponse(res, 'Invalid plan', 400);
-    }
 
     const result = await BillingService.createSubscription(req.userId!, plan as 'starter' | 'pro', gateway);
     successResponse(res, result);
@@ -34,9 +31,6 @@ export const createSubscription = async (req: AuthRequest, res: Response, next: 
 export const updatePlan = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { plan } = req.body;
-    if (!['free', 'starter', 'pro'].includes(plan)) {
-      return errorResponse(res, 'Invalid plan. Must be free, starter, or pro.', 400);
-    }
     const { prisma } = await import('../utils/prisma.js');
     const user = await prisma.user.update({
       where: { id: req.userId! },

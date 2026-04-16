@@ -17,6 +17,11 @@ describe('createSubscriptionSchema', () => {
     const result = createSubscriptionSchema.safeParse({ plan: 'enterprise' });
     expect(result.success).toBe(false);
   });
+
+  test('rejects invalid gateway value', () => {
+    const result = createSubscriptionSchema.safeParse({ plan: 'starter', gateway: 'enterprise' });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('updatePlanSchema', () => {
@@ -29,6 +34,11 @@ describe('updatePlanSchema', () => {
 
   test('rejects missing plan', () => {
     const result = updatePlanSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects invalid plan string', () => {
+    const result = updatePlanSchema.safeParse({ plan: 'enterprise' });
     expect(result.success).toBe(false);
   });
 });
