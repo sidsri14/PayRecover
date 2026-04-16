@@ -89,7 +89,26 @@ export async function processRecoveryJob(job: Job<RecoveryJobData>): Promise<voi
     const trackingUrl = `${backendUrl}/api/recovery/track/${failedPaymentId}`;
 
     // 4. Send Recovery Notification (Email / SMS / WhatsApp)
-    await NotificationService.dispatchRecovery(payment, trackingUrl);
+    const dayOffsetMap: Record<number, number> = { 0: 0, 1: 1, 2: 3 };
+    const reminder = await prisma.reminder.create({
+      data: {
+        failedPaymentId,
+        type: payment.retryCount >= 2 && payment.user.plan === 'pro' ? 'email+sms+whatsapp' : 'email',
+        dayOffset: dayOffsetMap[payment.retryCount] ?? payment.retryCount,
+        status: 'sent',
+      },
+    });
+
+    try {
+      await NotificationService.dispatchRecovery(payment, trackingUrl);
+    } catch (notifyErr) {
+      await prisma.reminder.update({
+        where: { id: reminder.id },
+        data: { status: 'failed', failedAt: new Date() },
+      });
+      logger.warn({ failedPaymentId, notifyErr }, 'Notification dispatch failed — marked in Reminder, continuing to schedule next retry');
+      // Do not rethrow — recovery link was created and next retry should still be scheduled
+    }
 
     // 5. Schedule Next Retry or Abandon
     if (payment.retryCount < 2) {
