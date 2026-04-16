@@ -17,6 +17,7 @@ import { Worker } from 'bullmq';
 import { prisma } from './utils/prisma.js';
 import { processRecoveryJob } from './jobs/recovery.processor.js';
 import { processPruneJob } from './jobs/prune.processor.js';
+import { processWebhookDeliveryJob } from './jobs/webhook.processor.js';
 import { enqueuePrunePiiJob } from './jobs/recovery.queue.js';
 
 const ABANDON_AFTER_DAYS = 7;
@@ -37,6 +38,9 @@ const recoveryWorker = new Worker(
   async (job) => {
     if (job.name === 'pii-prune') {
       return processPruneJob(job);
+    }
+    if (job.name === 'webhook-delivery') {
+      return processWebhookDeliveryJob(job);
     }
     return processRecoveryJob(job);
   },

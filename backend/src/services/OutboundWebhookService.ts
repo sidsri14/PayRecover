@@ -1,10 +1,8 @@
-import crypto from 'crypto';
 import pino from 'pino';
 import { prisma } from '../utils/prisma.js';
+import { enqueueWebhookDelivery } from '../jobs/recovery.queue.js';
 
 const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
-
-const DISPATCH_TIMEOUT_MS = 10_000; // 10 s per endpoint
 
 export type OutboundEvent =
   | 'payment.failed'
@@ -13,15 +11,12 @@ export type OutboundEvent =
   | 'payment.abandoned';
 
 /**
- * Sends outbound webhook notifications to all active merchant endpoints
- * that have subscribed to the given event type.
+ * Enqueues outbound webhook delivery jobs for all active merchant endpoints
+ * subscribed to the given event. Each delivery is a durable BullMQ job with
+ * exponential backoff (3 attempts, 10s base delay).
  *
- * Delivery is fire-and-forget: errors are logged but never thrown so the
+ * Dispatch is fire-and-forget: errors are logged but never thrown so the
  * calling recovery/webhook flow is never interrupted.
- *
- * Signature header: `x-payrecover-signature: sha256=<hex>`
- * Payload shape:
- *   { event, data: <payment-object>, timestamp: <ISO-string> }
  */
 export class OutboundWebhookService {
   static async dispatch(userId: string, event: OutboundEvent, data: object): Promise<void> {
@@ -45,51 +40,17 @@ export class OutboundWebhookService {
     });
 
     await Promise.allSettled(
-      endpoints.map(ep => OutboundWebhookService.deliver(ep, event, body))
+      endpoints.map(ep =>
+        enqueueWebhookDelivery({
+          endpointId: ep.id,
+          url: ep.url,
+          secret: ep.secret,
+          event,
+          body,
+        }).catch(err =>
+          logger.error({ err, endpointId: ep.id, event }, '[Outbound Webhook] Failed to enqueue delivery job')
+        )
+      )
     );
-  }
-
-  private static async deliver(
-    endpoint: { id: string; url: string; secret: string },
-    event: string,
-    body: string,
-  ): Promise<void> {
-    const sig = `sha256=${crypto.createHmac('sha256', endpoint.secret).update(body).digest('hex')}`;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
-
-    try {
-      const res = await fetch(endpoint.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-payrecover-signature': sig,
-          'x-payrecover-event': event,
-        },
-        body,
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        logger.warn(
-          { endpointId: endpoint.id, url: endpoint.url, status: res.status, event },
-          '[Outbound Webhook] Non-2xx response'
-        );
-      } else {
-        logger.info(
-          { endpointId: endpoint.id, url: endpoint.url, status: res.status, event },
-          '[Outbound Webhook] Delivered'
-        );
-      }
-    } catch (err: any) {
-      const reason = err?.name === 'AbortError' ? 'timeout' : err?.message;
-      logger.error(
-        { endpointId: endpoint.id, url: endpoint.url, event, reason },
-        '[Outbound Webhook] Delivery failed'
-      );
-    } finally {
-      clearTimeout(timeout);
-    }
   }
 }

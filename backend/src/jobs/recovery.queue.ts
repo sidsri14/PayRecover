@@ -32,6 +32,18 @@ export async function enqueueRecoveryJob(failedPaymentId: string, delayMs = 0): 
   );
 }
 
+export interface WebhookDeliveryJobData {
+  endpointId: string;
+  url: string;
+  secret: string;
+  event: string;
+  body: string;
+}
+
+export async function enqueueWebhookDelivery(data: WebhookDeliveryJobData): Promise<void> {
+  await recoveryQueue.add('webhook-delivery', data);
+}
+
 /**
  * Register the daily PII-prune repeatable job.
  *
