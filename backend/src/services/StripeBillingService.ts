@@ -1,9 +1,17 @@
 import Stripe from 'stripe';
 import { prisma } from '../utils/prisma.js';
 
-const stripe = new Stripe(process.env.STRIPE_PLATFORM_SECRET_KEY || '', {
-  apiVersion: '2023-10-16' as any,
-});
+let _stripe: Stripe | null = null;
+const getStripe = () => {
+  if (!_stripe) {
+    const secret = process.env.STRIPE_PLATFORM_SECRET_KEY;
+    if (!secret) throw new Error('STRIPE_PLATFORM_SECRET_KEY is missing');
+    _stripe = new Stripe(secret, {
+      apiVersion: '2023-10-16' as any,
+    });
+  }
+  return _stripe;
+};
 
 const PRICE_IDS = {
   starter: process.env.STRIPE_STARTER_PRICE_ID,
@@ -23,7 +31,7 @@ export class StripeBillingService {
       throw { status: 500, message: `Stripe Price ID for '${plan}' is not configured on the server.` };
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       customer_email: user.email,
@@ -111,6 +119,6 @@ export class StripeBillingService {
 
   static async verifyWebhookSignature(body: Buffer, signature: string) {
     const secret = process.env.STRIPE_PLATFORM_WEBHOOK_SECRET || '';
-    return stripe.webhooks.constructEvent(body, signature, secret);
+    return getStripe().webhooks.constructEvent(body, signature, secret);
   }
 }
