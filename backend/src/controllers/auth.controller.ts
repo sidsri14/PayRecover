@@ -175,7 +175,7 @@ export const sendTestEmail = async (req: AuthRequest, res: Response, next: NextF
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId! },
-      select: { email: true, brandSettings: true, brandEmailSubject: true, brandEmailTone: true }
+      select: { email: true, name: true, brandSettings: true, brandEmailSubject: true, brandEmailTone: true }
     });
 
     if (!user) return errorResponse(res, 'User not found', 404);
