@@ -10,7 +10,7 @@ interface BrandingSettings {
   logoUrl?: string;
   primaryColor?: string;
   companyName?: string;
-  emailSignature?: string;
+  signature?: string;
 }
 
 interface Props {
@@ -26,7 +26,7 @@ const Branding: FC<Props> = ({ user, onUpdateUser }) => {
     logoUrl: '',
     primaryColor: '#10b981',
     companyName: '',
-    emailSignature: '',
+    signature: '',
   });
   const [emailSubject, setEmailSubject] = useState('');
   const [emailTone, setEmailTone] = useState<'professional' | 'friendly' | 'urgent'>('professional');
@@ -204,8 +204,8 @@ const Branding: FC<Props> = ({ user, onUpdateUser }) => {
                 <textarea
                   rows={4}
                   placeholder="Ex: Best regards, The Acme Team"
-                  value={form.emailSignature}
-                  onChange={e => setForm(f => ({ ...f, emailSignature: e.target.value }))}
+                  value={form.signature}
+                  onChange={e => setForm(f => ({ ...f, signature: e.target.value }))}
                   className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 outline-none focus:ring-2 focus:ring-stone-100 transition-all text-sm"
                 />
               </div>
@@ -416,9 +416,9 @@ const Branding: FC<Props> = ({ user, onUpdateUser }) => {
                     </div>
                   </div>
 
-                  {form.emailSignature && (
+                  {form.signature && (
                     <div className="pt-10 border-t border-stone-100 dark:border-stone-800 text-sm italic text-stone-400">
-                      {form.emailSignature}
+                      {form.signature}
                     </div>
                   )}
                 </div>

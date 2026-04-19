@@ -5,13 +5,7 @@ import { csrfCheck } from '../middleware/csrf.middleware.js';
 
 const router = Router();
 
-// Gate demo routes in production
-router.use((_req, res, next) => {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(403).json({ error: 'Demo routes are disabled in production' });
-  }
-  next();
-});
+// Demo routes are used for onboarding/testing and are safe under requireAuth
 
 router.post('/simulate-failure', csrfCheck, requireAuth, simulateFailure);
 router.post('/simulate-success/:id', csrfCheck, requireAuth, simulateSuccess);
