@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { FC } from 'react';
-import { Type, Image as ImageIcon, Loader2, Save, Eye } from 'lucide-react';
+import { Type, Image as ImageIcon, Loader2, Save, Eye, Mail, Terminal, ExternalLink, Copy, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { api } from '../api';
 import toast from 'react-hot-toast';
@@ -20,6 +20,8 @@ interface Props {
 
 const Branding: FC<Props> = ({ user, onUpdateUser }) => {
   const [loading, setLoading] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [form, setForm] = useState<BrandingSettings>({
     logoUrl: '',
     primaryColor: '#10b981',
@@ -32,7 +34,9 @@ const Branding: FC<Props> = ({ user, onUpdateUser }) => {
   useEffect(() => {
     if (user.brandSettings) {
       try {
-        const settings = JSON.parse(user.brandSettings as string);
+        const settings = typeof user.brandSettings === 'string' 
+          ? JSON.parse(user.brandSettings) 
+          : user.brandSettings;
         setForm(prev => ({ ...prev, ...settings }));
       } catch (e) {
         console.error('Failed to parse brand settings', e);
@@ -46,7 +50,7 @@ const Branding: FC<Props> = ({ user, onUpdateUser }) => {
     setLoading(true);
     try {
       const { data } = await api.patch('/auth/branding', { 
-        brandSettings: JSON.stringify(form),
+        brandSettings: form, // Backend expects object now or string? (Previously it was JSON.stringify(form))
         brandEmailSubject: emailSubject,
         brandEmailTone: emailTone
       });
@@ -59,6 +63,27 @@ const Branding: FC<Props> = ({ user, onUpdateUser }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSendTest = async () => {
+    setTestLoading(true);
+    try {
+      await api.post('/auth/test-email');
+      toast.success('Test email sent to ' + user.email);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to send test email');
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const webhookUrl = `${window.location.protocol}//pay-recovery-web-production.up.railway.app/api/webhooks/razorpay`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success('Webhook URL copied');
   };
 
   return (
@@ -187,6 +212,69 @@ const Branding: FC<Props> = ({ user, onUpdateUser }) => {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-6">
+            <div className="flex items-center gap-3 border-b border-stone-100 dark:border-stone-800 pb-4">
+              <Mail className="w-5 h-5 text-stone-400" />
+              <h2 className="text-lg font-bold text-stone-700 dark:text-stone-200">Test Communication</h2>
+            </div>
+            <div className="bg-stone-50 dark:bg-stone-900/50 p-6 rounded-2xl border border-stone-100 dark:border-stone-800 space-y-4">
+              <p className="text-xs text-stone-500 leading-relaxed font-medium">
+                Verify your Branding and SMTP configuration by sending a sample recovery email to yourself.
+              </p>
+              <button
+                onClick={handleSendTest}
+                disabled={testLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-200 font-bold rounded-xl text-xs hover:bg-stone-50 dark:hover:bg-stone-700 transition-all shadow-sm"
+              >
+                {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                Send Test Email
+              </button>
+            </div>
+          </section>
+
+          <section className="space-y-6">
+            <div className="flex items-center gap-3 border-b border-stone-100 dark:border-stone-800 pb-4">
+              <Terminal className="w-5 h-5 text-stone-400" />
+              <h2 className="text-lg font-bold text-stone-700 dark:text-stone-200">Webhook Setup</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest pl-1">Your Unique Webhook URL</label>
+                <div className="flex gap-2">
+                  <div className="flex-1 px-4 py-3 bg-stone-100 dark:bg-stone-900/80 rounded-xl font-mono text-[10px] truncate text-stone-500 border border-stone-200 dark:border-stone-800">
+                    {webhookUrl}
+                  </div>
+                  <button 
+                    onClick={copyToClipboard}
+                    className="px-4 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl hover:bg-stone-50 transition-all shadow-sm"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-stone-400" />}
+                  </button>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                 <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-xl">
+                   <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 leading-normal">
+                     Step 1: Go to your payment provider's dashboard (Razorpay or Stripe).<br/>
+                     Step 2: Add a new Webhook with the URL above.<br/>
+                     Step 3: Select the "payment.failed" event.<br/>
+                     Step 4: Save and everything will be captured automatically.
+                   </p>
+                 </div>
+                 <a 
+                   href="https://razorpay.com/docs/webhooks/setup/" 
+                   target="_blank" 
+                   rel="noreferrer"
+                   className="flex items-center justify-between p-4 bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 rounded-xl hover:border-stone-200 transition-all text-[10px] font-bold text-stone-600 dark:text-stone-400"
+                 >
+                   Razorpay Webhook Guide
+                   <ExternalLink className="w-3 h-3" />
+                 </a>
               </div>
             </div>
           </section>
