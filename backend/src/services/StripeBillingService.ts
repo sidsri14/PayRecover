@@ -152,7 +152,7 @@ export class StripeBillingService {
         if (type === 'invoice' && invoiceId) {
           await prisma.invoice.update({
             where: { id: invoiceId },
-            data: { status: 'paid' }
+            data: { status: 'PAID' }
           });
         }
         break;

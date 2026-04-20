@@ -48,11 +48,11 @@ export async function sendInvoiceEmail(
 ): Promise<void> {
   await sendEmail({
     to: invoice.client.email,
-    subject: `Invoice ${invoice.number} from ${invoice.user.name ?? APP_NAME} — $${(invoice.amountCents / 100).toFixed(2)}`,
+    subject: `Invoice ${invoice.number} from ${invoice.user.name ?? APP_NAME} — $${(invoice.amount / 100).toFixed(2)}`,
     html: `
       <h2>Invoice ${invoice.number}</h2>
       <p>Hi ${invoice.client.name},</p>
-      <p>Please find your invoice for <strong>$${(invoice.amountCents / 100).toFixed(2)} ${invoice.currency}</strong>, due on ${new Date(invoice.dueDate).toDateString()}.</p>
+      <p>Please find your invoice for <strong>$${(invoice.amount / 100).toFixed(2)} ${invoice.currency}</strong>, due on ${new Date(invoice.dueDate).toDateString()}.</p>
       <p>
         <a href="${paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">Pay Now</a>
       </p>
@@ -72,7 +72,7 @@ export async function sendReminderEmail(invoice: InvoiceWithClient): Promise<voi
     html: `
       <h2>${isOverdue ? 'Overdue Invoice' : 'Payment Reminder'}</h2>
       <p>Hi ${invoice.client.name},</p>
-      <p>Invoice ${invoice.number} for <strong>$${(invoice.amountCents / 100).toFixed(2)}</strong> is ${isOverdue ? 'past due' : 'due on ' + new Date(invoice.dueDate).toDateString()}.</p>
+      <p>Invoice ${invoice.number} for <strong>$${(invoice.amount / 100).toFixed(2)}</strong> is ${isOverdue ? 'past due' : 'due on ' + new Date(invoice.dueDate).toDateString()}.</p>
       <p>Please complete your payment at your earliest convenience. Contact ${invoice.user.name ?? APP_NAME} if you have questions.</p>
     `,
   });
@@ -85,7 +85,7 @@ export async function sendReceiptEmail(invoice: InvoiceWithClient): Promise<void
     html: `
       <h2>Payment Confirmed</h2>
       <p>Hi ${invoice.client.name},</p>
-      <p>Thank you! We've received your payment of <strong>$${(invoice.amountCents / 100).toFixed(2)}</strong> for Invoice ${invoice.number}.</p>
+      <p>Thank you! We've received your payment of <strong>$${(invoice.amount / 100).toFixed(2)}</strong> for Invoice ${invoice.number}.</p>
       <p>This email serves as your receipt. Paid on ${new Date().toDateString()}.</p>
     `,
   });

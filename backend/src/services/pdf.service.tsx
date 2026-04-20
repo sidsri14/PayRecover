@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
 });
 
 function InvoiceDocument({ invoice }: { invoice: InvoiceForPDF }) {
-  const total = (invoice.amountCents / 100).toFixed(2);
+  const total = (invoice.amount / 100).toFixed(2);
   return (
     <Document>
       <Page size="A4" style={styles.page}>

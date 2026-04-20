@@ -29,10 +29,11 @@ export class InvoiceService {
     const invoice = await prisma.invoice.create({
       data: {
         userId,
-        clientId: data.clientId ?? '', 
+        clientId: (data.clientId as string) || '', 
         number: `INV-${Date.now()}`,
+        clientEmail: data.clientEmail,
         description: data.description,
-        amountCents: data.amount,
+        amount: data.amount,
         dueDate: data.dueDate,
         currency: data.currency || 'USD',
         status: 'SENT'

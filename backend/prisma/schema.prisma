@@ -154,9 +154,11 @@ model Invoice {
   clientId              String
   number                String
   status                InvoiceStatus @default(DRAFT)
-  amountCents           Int
+  amount                Int
   currency              String        @default("USD")
   description           String
+  clientEmail           String
+  pdfUrl                String?
   dueDate               DateTime
   stripeSessionId       String?
   stripePaymentIntentId String?
