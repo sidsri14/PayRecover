@@ -1,11 +1,13 @@
 import { type FC, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, User, Mail, Phone, Building, Trash2 } from 'lucide-react';
+import { Plus, User, Mail, Phone, Building, Trash2, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 const Clients: FC = () => {
+  const navigate = useNavigate();
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({

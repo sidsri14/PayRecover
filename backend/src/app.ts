@@ -14,7 +14,6 @@ import authRoutes from './routes/auth.routes.js';
 import billingRoutes from './routes/billing.routes.js';
 import teamRoutes from './routes/team.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
-import dashboardRoutes from './routes/dashboard.routes.js';
 import webhookEndpointRoutes from './routes/webhookEndpoints.routes.js';
 import apiKeyRoutes from './routes/apiKeys.routes.js';
 import auditRoutes from './routes/audit.routes.js';
@@ -81,8 +80,7 @@ app.use(helmet({
 app.use(morgan('dev'));
 app.use(cookieParser());
 
-// Webhook routes need raw body for signature verification
-app.use('/api/webhooks', webhookRoutes);
+// Webhook routes
 app.post('/api/webhooks/billing/razorpay', express.raw({ type: 'application/json' }), billingWebhook);
 app.post('/api/webhooks/billing/stripe', express.raw({ type: 'application/json' }), stripeBillingWebhook);
 

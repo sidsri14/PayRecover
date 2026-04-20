@@ -15,7 +15,7 @@ const LandingPage: FC = () => {
             <div className="bg-stone-900 p-2 rounded-xl">
               <CheckCircle2 className="w-5 h-5 text-white" />
             </div>
-            <span className="font-black text-xl tracking-tighter text-stone-900 uppercase">StripeFlow</span>
+            <span className="font-black text-xl tracking-tighter text-stone-900 uppercase">StripePay</span>
           </div>
           <div className="flex items-center gap-6">
             <button onClick={() => navigate('/login')} className="text-sm font-bold text-stone-500 hover:text-stone-900 transition-colors">Sign In</button>
@@ -126,9 +126,9 @@ const LandingPage: FC = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
            <div className="flex items-center gap-2 opacity-30">
             <CheckCircle2 className="w-5 h-5 text-stone-900" />
-            <span className="font-black text-lg tracking-tighter text-stone-900 uppercase">StripeFlow</span>
+            <span className="font-black text-lg tracking-tighter text-stone-900 uppercase">StripePay</span>
           </div>
-          <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">&copy; 2026 StripeFlow Engine. All rights reserved.</p>
+          <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">&copy; 2026 StripePay Engine. All rights reserved.</p>
           <div className="flex gap-6 text-xs font-black uppercase tracking-widest text-stone-400">
             <a href="#" className="hover:text-stone-900 transition-colors">Terms</a>
             <a href="#" className="hover:text-stone-900 transition-colors">Privacy</a>

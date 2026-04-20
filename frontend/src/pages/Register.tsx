@@ -69,12 +69,12 @@ const Register: React.FC<Props> = ({ onRegisterSuccess }) => {
               <CheckCircle2 className="w-9 h-9 text-white" />
             </div>
             <h1 className="text-2xl font-black tracking-tighter text-stone-900 dark:text-stone-100 uppercase">
-              StripeFlow
+              StripePay
             </h1>
           </div>
 
           <p className="text-center text-stone-400 mb-8 font-medium text-sm">
-            Create your account to get started.
+            Powered by StripePay &middot; Instant Freelancer Invoicing
           </p>
 
           {oauthError && (
@@ -93,7 +93,7 @@ const Register: React.FC<Props> = ({ onRegisterSuccess }) => {
 
           <form onSubmit={handleRegister} className="space-y-5" noValidate>
             <div className="space-y-1.5">
-              <label htmlFor="reg-name" className="text-xs font-semibold uppercase tracking-wider text-stone-400 ml-1">Full Name</label>
+              <label htmlFor="reg-name" className="font-bold text-stone-800 uppercase tracking-widest text-xs">StripePay Secure Payment</label>
               <div className="relative">
                 <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-300" aria-hidden="true" />
                 <input

@@ -158,7 +158,7 @@ const Layout: React.FC<React.PropsWithChildren<LayoutProps>> = ({ children, user
             <TrendingUp className="w-5 h-5 text-white" />
           </div>
           <span className="font-bold text-xl tracking-tight text-stone-800 dark:text-stone-100 hidden sm:block">
-            StripeFlow
+            StripePay
           </span>
         </div>
 
@@ -216,7 +216,7 @@ const Layout: React.FC<React.PropsWithChildren<LayoutProps>> = ({ children, user
 
     <footer className="p-8 border-t border-warm-border dark:border-stone-800 flex flex-col sm:flex-row items-center justify-between gap-4 max-w-7xl mx-auto w-full">
       <p className="text-xs font-medium text-stone-400 tracking-wide">
-        &copy; 2026 StripeFlow
+        &copy; 2026 StripePay
       </p>
       <div className="flex gap-6 text-xs font-medium text-stone-400">
         <Link to="/terms" className="hover:text-stone-600 dark:hover:text-stone-300 transition-colors">Terms</Link>
@@ -234,21 +234,21 @@ function PageTitle() {
   const location = useLocation();
   useEffect(() => {
     const titles: Record<string, string> = {
-      '/': 'StripeFlow | Premium Invoicing for Freelancers',
-      '/dashboard': 'Dashboard | StripeFlow',
-      '/login': 'Sign In | StripeFlow',
-      '/register': 'Create Account | StripeFlow',
-      '/invoices': 'Invoices | StripeFlow',
-      '/clients': 'Clients | StripeFlow',
-      '/demo': 'Live Demo | StripeFlow',
-      '/settings': 'Settings | StripeFlow',
-      '/branding': 'Branding | StripeFlow',
-      '/security': 'Security | StripeFlow',
-      '/forgot-password': 'Reset Password | StripeFlow',
-      '/reset-password': 'New Password | StripeFlow',
-      '/verify-email': 'Verify Account | StripeFlow',
+      '/': 'StripePay | Premium Invoicing for Freelancers',
+      '/dashboard': 'Dashboard | StripePay',
+      '/login': 'Sign In | StripePay',
+      '/register': 'Create Account | StripePay',
+      '/invoices': 'Invoices | StripePay',
+      '/clients': 'Clients | StripePay',
+      '/demo': 'Live Demo | StripePay',
+      '/settings': 'Settings | StripePay',
+      '/branding': 'Branding | StripePay',
+      '/security': 'Security | StripePay',
+      '/forgot-password': 'Reset Password | StripePay',
+      '/reset-password': 'New Password | StripePay',
+      '/verify-email': 'Verify Account | StripePay',
     };
-    document.title = titles[location.pathname] || 'StripeFlow | Invoicing for Freelancers';
+    document.title = titles[location.pathname] || 'StripePay | Invoicing for Freelancers';
   }, [location.pathname]);
   return null;
 }
