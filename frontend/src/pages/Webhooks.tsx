@@ -363,7 +363,7 @@ const Webhooks: FC = () => {
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-4xl font-black text-stone-900 dark:text-white tracking-tighter">Webhooks</h1>
+          <h1 className="text-4xl font-black text-stone-900 dark:text-white tracking-tight">StripePay Webhooks</h1>
           <p className="text-stone-400 mt-2 font-medium">
             Get real-time notifications on your server when payment events occur.
           </p>

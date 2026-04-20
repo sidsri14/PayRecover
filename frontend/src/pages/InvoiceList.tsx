@@ -92,7 +92,7 @@ const InvoiceList: FC = () => {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="hover:bg-stone-50/50 dark:hover:bg-stone-800/30 transition-colors group"
+                      className="hover:bg-stone-50/50 dark:hover:bg-stone-800/30 transition-all duration-300 group cursor-pointer"
                     >
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
@@ -123,7 +123,7 @@ const InvoiceList: FC = () => {
                         {formatAmount(invoice.amount)}
                       </td>
                       <td className="px-6 py-5 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
                           <button
                             onClick={() => window.open(invoice.pdfUrl, '_blank')}
                             className="p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400 hover:text-stone-600 transition-all"

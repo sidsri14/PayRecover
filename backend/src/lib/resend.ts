@@ -16,12 +16,15 @@ export async function sendInvoiceEmail(to: string, pdfUrl: string, paymentUrl: s
   if (!resend) throw new Error('Resend Not Initialized');
 
   const { data, error } = await resend.emails.send({
-    from: 'StripeFlow <invoices@yourdomain.com>', 
+    from: 'StripeFlow <onboarding@resend.dev>',
     to,
     subject: `Invoice: ${invoice.description} - ${amount} ${invoice.currency || 'USD'}`,
     html: `
-      <!-- ... html content ... -->
-    `,
+      <h1>Invoice for ${invoice.description}</h1>
+      <p>Amount: ${amount} ${invoice.currency}</p>
+      <p>Due: ${invoice.dueDate.toLocaleDateString()}</p>
+      <p><a href="${paymentUrl}">Pay Now</a></p>
+    `
   });
 
   if (error) {

@@ -196,11 +196,7 @@ const Settings: FC<Props> = ({ user, onUpdateUser }) => {
                 <div className="flex items-center gap-2"><h3 className="font-bold text-emerald-600 dark:text-emerald-400 italic">Pro Invoicing</h3><Zap className="w-3 h-3 text-amber-400 fill-amber-400" /></div>
                 <p className="text-2xl font-black text-stone-900 dark:text-white mt-1">$19<span className="text-sm font-medium text-stone-400">/mo</span></p>
               </div>
-              {user.plan !== 'free' ? (
-                <span className="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold uppercase rounded-md border border-emerald-200 dark:border-emerald-800">Current Plan</span>
-              ) : (
-                <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase rounded-md border border-amber-200 dark:border-amber-800 animate-pulse">Unlock Worker</span>
-              )}
+                <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase rounded-md border border-amber-200 dark:border-amber-800 animate-pulse">Unlock Pro</span>
             </div>
             <ul className="space-y-3 mb-8">
               <li className="flex items-center gap-2 text-sm text-stone-700 dark:text-stone-200 font-medium"><Check className="w-4 h-4 text-emerald-500" /> Unlimited Invoices</li>
@@ -266,8 +262,8 @@ const Settings: FC<Props> = ({ user, onUpdateUser }) => {
             </div>
           </div>
           <button 
-            onClick={() => window.location.href = '/branding'}
-            className="w-full md:w-auto px-8 py-3.5 bg-stone-900 dark:bg-white text-white dark:text-stone-900 font-bold rounded-2xl text-sm transition-all hover:-translate-y-0.5"
+            onClick={() => navigate('/branding')}
+            className="w-full md:w-auto px-8 py-3.5 bg-stone-900 dark:bg-white text-white dark:text-stone-900 font-bold rounded-2xl text-sm transition-all hover:shadow-lg hover:-translate-y-0.5"
           >
             Configure Branding
           </button>

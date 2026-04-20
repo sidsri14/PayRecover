@@ -29,18 +29,17 @@ export class InvoiceService {
     const invoice = await prisma.invoice.create({
       data: {
         userId,
-        clientId: data.clientId,
-        clientEmail: data.clientEmail,
+        clientId: data.clientId ?? '', 
+        number: `INV-${Date.now()}`,
         description: data.description,
-        amount: data.amount,
+        amountCents: data.amount,
         dueDate: data.dueDate,
         currency: data.currency || 'USD',
-        status: 'pending'
+        status: 'SENT'
       }
     });
 
-    // 3. Generate PDF (Mock URL for now, or save to some storage like S3/Vercel Blob)
-    // For MVP, we might just generate it and send it via email directly as buffer
+    // 3. Generate PDF
     const pdfBuffer = await PdfService.generateInvoicePdf(invoice, user, client || { name: data.clientEmail, email: data.clientEmail });
     
     // In a real app, you'd upload this to S3:

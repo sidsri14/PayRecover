@@ -75,7 +75,7 @@ export class PdfService {
     doc.setTextColor(17, 24, 39);
     doc.setFontSize(11);
     doc.text(invoice.description, margin, y);
-    doc.text(`$${(invoice.amount / 100).toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
+    doc.text(`$${(invoice.amountCents / 100).toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
 
     y += 10;
     doc.setDrawColor(243, 244, 246);
@@ -86,7 +86,7 @@ export class PdfService {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.text('Total Amount Due:', pageWidth - 200, y);
-    doc.text(`$${(invoice.amount / 100).toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
+    doc.text(`$${(invoice.amountCents / 100).toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
 
     y += 20;
     doc.setFont('helvetica', 'normal');

@@ -4,6 +4,7 @@ import { ExternalLink, RotateCcw, Lock } from 'lucide-react';
 import { StatusBadge } from './Badges';
 
 import { formatAmount, daysSince } from '../../utils/format';
+import { cn } from '../../utils/cn';
 
 interface PaymentRowProps {
   payment: {
@@ -39,7 +40,7 @@ export const PaymentRow: React.FC<PaymentRowProps> = React.memo(({
       <div className="flex items-center p-5 sm:px-8 gap-6">
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onView(payment.id)}>
           <div className="flex items-center gap-3 mb-1.5 flex-wrap">
-            <h4 className="text-base font-bold truncate group-hover:underline text-black dark:text-white transition-all">
+            <h4 className="text-base font-bold truncate group-hover:underline text-stone-900 dark:text-stone-100 transition-all">
               {payment.customerName || payment.customerEmail}
             </h4>
             <StatusBadge status={payment.status} />

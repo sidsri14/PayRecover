@@ -123,7 +123,7 @@ const HEARTBEAT_KEY = 'stripepay:worker:heartbeat';
 const WORKER_STALE_MS = 150_000; // matches worker TTL
 
 app.get('/health', async (_req, res) => {
-  const checks: Record<string, string> = { database: 'unknown', redis: 'unknown', razorpay: 'unknown', worker: 'unknown' };
+  const checks: Record<string, string> = { database: 'unknown', redis: 'unknown', stripe: 'unknown', worker: 'unknown' };
   let healthy = true;
 
   try {
@@ -154,9 +154,9 @@ app.get('/health', async (_req, res) => {
     healthy = false;
   }
 
-  const keyId = process.env.RAZORPAY_KEY_ID || '';
-  checks.razorpay = keyId.startsWith('rzp_') ? 'configured' : 'missing';
-  if (checks.razorpay === 'missing') healthy = false;
+  const stripeKey = process.env.STRIPE_PLATFORM_SECRET_KEY || '';
+  checks.stripe = stripeKey.startsWith('sk_') ? 'configured' : 'missing';
+  if (checks.stripe === 'missing') healthy = false;
 
   res.status(200).json({
     status: healthy ? 'ok' : 'degraded',
