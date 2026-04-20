@@ -66,7 +66,7 @@ const Privacy = () => {
           <ul className="list-disc pl-6 mt-4 space-y-2 text-sm">
             <li><strong>Railway / Neon:</strong> Cloud infrastructure and database hosting.</li>
             <li><strong>Resend:</strong> Transactional email delivery.</li>
-            <li><strong>Twilio:</strong> SMS and WhatsApp gateway delivery.</li>
+            <li><strong>Stripe:</strong> Payment processing and checkout.</li>
             <li><strong>Vercel:</strong> Static frontend hosting.</li>
           </ul>
         </section>

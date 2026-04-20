@@ -40,8 +40,8 @@ describe('processWebhookDeliveryJob', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, opts] = mockFetch.mock.calls[0] as [string, any];
     expect(url).toBe(jobData.url);
-    expect(opts.headers['x-payrecover-event']).toBe('payment.failed');
-    expect(opts.headers['x-payrecover-signature']).toMatch(/^sha256=[a-f0-9]{64}$/);
+    expect(opts.headers['x-stripepay-event']).toBe('payment.failed');
+    expect(opts.headers['x-stripepay-signature']).toMatch(/^sha256=[a-f0-9]{64}$/);
   });
 
   test('logs success delivery to DB', async () => {

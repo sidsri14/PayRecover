@@ -68,7 +68,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({ stats }) => {
            initial={{ opacity: 0, y: 10 }}
            animate={{ opacity: 1, y: 0 }}
            transition={{ delay: idx * 0.05 }}
-           className="p-5 rounded-2xl border border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm hover:shadow-md transition-all group"
+           className="p-5 rounded-2xl border border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-emerald-500/30 transition-all group cursor-pointer"
         >
           <div className="flex justify-between items-start mb-4">
             <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 group-hover:text-stone-500 transition-colors">

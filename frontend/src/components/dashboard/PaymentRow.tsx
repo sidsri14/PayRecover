@@ -35,7 +35,7 @@ export const PaymentRow: React.FC<PaymentRowProps> = React.memo(({
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all duration-300"
+      className="group hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 transition-all duration-300 border-l-2 border-transparent hover:border-emerald-500"
     >
       <div className="flex items-center p-5 sm:px-8 gap-6">
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onView(payment.id)}>

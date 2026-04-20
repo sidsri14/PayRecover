@@ -41,7 +41,7 @@ function validateEnv(): void {
 validateEnv();
 
 const server = app.listen(port, () => {
-  console.log(`PayRecover server running on port ${port}`);
+  console.log(`StripePay server running on port ${port}`);
 });
 
 // ── Graceful Shutdown
