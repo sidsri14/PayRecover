@@ -12,6 +12,7 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
     clientID: GOOGLE_CLIENT_ID,
     clientSecret: GOOGLE_CLIENT_SECRET,
     callbackURL: CALLBACK_URL,
+    proxy: true,
   },
     async (accessToken, refreshToken, profile, done) => {
       try {

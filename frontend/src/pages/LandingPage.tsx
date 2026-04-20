@@ -2,23 +2,26 @@ import { type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ArrowRight, Zap, FileText, Send, CreditCard } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import { ThemeToggle } from '../components/common/ThemeToggle';
 
 const LandingPage: FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-cream overflow-hidden">
+    <div className="min-h-screen bg-cream dark:bg-stone-900 transition-colors overflow-hidden font-sans">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-cream/80 backdrop-blur-md border-b border-warm-border/50">
+      <nav className="fixed top-0 w-full z-50 bg-cream/80 dark:bg-stone-900/80 backdrop-blur-md border-b border-warm-border/50 dark:border-stone-800/50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-stone-900 p-2 rounded-xl">
+            <div className="bg-stone-900 dark:bg-emerald-600 p-2 rounded-xl">
               <CheckCircle2 className="w-5 h-5 text-white" />
             </div>
-            <span className="font-black text-xl tracking-tighter text-stone-900 uppercase">StripePay</span>
+            <span className="font-black text-xl tracking-tighter text-stone-900 dark:text-stone-100 uppercase">StripePay</span>
           </div>
-          <div className="flex items-center gap-6">
-            <button onClick={() => navigate('/login')} className="text-sm font-bold text-stone-500 hover:text-stone-900 transition-colors">Sign In</button>
+          <div className="flex items-center gap-4 sm:gap-6">
+            <ThemeToggle />
+            <button onClick={() => navigate('/login')} className="text-sm font-bold text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 transition-colors">Sign In</button>
             <button onClick={() => navigate('/register')} className="px-5 py-2.5 bg-stone-900 text-white text-sm font-bold rounded-xl hover:bg-stone-800 transition-all shadow-xl shadow-stone-900/10">Start Free</button>
           </div>
         </div>
@@ -38,9 +41,9 @@ const LandingPage: FC = () => {
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-6xl md:text-8xl font-black text-stone-900 tracking-tighter leading-[0.9]"
+            className="text-6xl md:text-8xl font-black text-stone-900 dark:text-white tracking-tighter leading-[0.9]"
           >
-            GET PAID <br /> <span className="text-emerald-500">EFFORTLESSLY.</span>
+            GET PAID <br /> <span className="text-emerald-500 dark:text-emerald-400">EFFORTLESSLY.</span>
           </motion.h1>
 
           <motion.p
@@ -130,9 +133,9 @@ const LandingPage: FC = () => {
           </div>
           <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">&copy; 2026 StripePay Engine. All rights reserved.</p>
           <div className="flex gap-6 text-xs font-black uppercase tracking-widest text-stone-400">
-            <a href="#" className="hover:text-stone-900 transition-colors">Terms</a>
-            <a href="#" className="hover:text-stone-900 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-stone-900 transition-colors">Contact</a>
+            <Link to="/terms" className="hover:text-stone-900 dark:hover:text-stone-100 transition-colors">Terms</Link>
+            <Link to="/privacy" className="hover:text-stone-900 dark:hover:text-stone-100 transition-colors">Privacy</Link>
+            <Link to="/contact" className="hover:text-stone-900 dark:hover:text-stone-100 transition-colors">Contact</Link>
           </div>
         </div>
       </footer>
