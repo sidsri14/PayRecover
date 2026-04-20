@@ -36,5 +36,5 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
     })),
   });
 
-  if (error) throw new Error(`Resend error: ${(error as { message: string }).message}`);
+  if (error) throw new Error(`Resend error: ${error.message}`);
 }
