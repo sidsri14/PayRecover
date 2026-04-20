@@ -16,7 +16,6 @@ const Clients = lazy(() => import('./pages/Clients'));
 const Demo = lazy(() => import('./pages/Demo'));
 // Keep existing ones for now or migrate
 const Settings = lazy(() => import('./pages/Settings'));
-const Branding = lazy(() => import('./pages/Branding'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
@@ -335,7 +334,6 @@ function App() {
                     <Route path="/invoices/new" element={<CreateInvoice />} />
                     <Route path="/clients" element={<Clients />} />
                     <Route path="/settings" element={<Settings user={user} onUpdateUser={(u) => setUser(u)} />} />
-                    <Route path="/branding" element={<Branding user={user} onUpdateUser={(u) => setUser(u)} />} />
                     <Route path="/security" element={<Security />} />
                     <Route path="/team" element={<Team />} />
                     <Route path="*" element={<Navigate to="/dashboard" />} />

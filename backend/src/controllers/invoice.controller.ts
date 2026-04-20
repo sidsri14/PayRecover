@@ -30,12 +30,41 @@ export class InvoiceController {
 
   static async list(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const invoices = await prisma.invoice.findMany({
-        where: { userId: req.userId! },
-        include: { client: true },
-        orderBy: { createdAt: 'desc' }
+      const { page = 1, limit = 10, search, status, clientId, sortKey = 'createdAt', sortDir = 'desc' } = req.query;
+      const skip = (Number(page) - 1) * Number(limit);
+      const take = Number(limit);
+
+      const where: any = {
+        userId: req.userId!,
+        ...(status && { status: String(status) }),
+        ...(clientId && { clientId: String(clientId) }),
+        ...(search && {
+          OR: [
+            { clientEmail: { contains: String(search) } },
+            { description: { contains: String(search) } },
+            { client: { name: { contains: String(search) } } }
+          ]
+        })
+      };
+
+      const [invoices, total] = await Promise.all([
+        prisma.invoice.findMany({
+          where,
+          include: { client: true },
+          orderBy: { [String(sortKey)]: String(sortDir) },
+          skip,
+          take
+        }),
+        prisma.invoice.count({ where })
+      ]);
+
+      successResponse(res, {
+        invoices,
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        pages: Math.ceil(total / Number(limit))
       });
-      successResponse(res, invoices);
     } catch (err) {
       next(err);
     }

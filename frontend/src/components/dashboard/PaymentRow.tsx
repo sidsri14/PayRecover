@@ -46,16 +46,20 @@ export const PaymentRow: React.FC<PaymentRowProps> = React.memo(({
             <span className="text-base font-bold text-stone-700 dark:text-stone-300">
               {formatAmount(payment.amount, payment.currency)}
             </span>
-            {payment.status === 'recovered' && payment.recoveredVia === 'link' && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-emerald-500/5 text-emerald-500 border-emerald-200 dark:border-emerald-800">
-                via link
-              </span>
-            )}
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs font-medium text-stone-400">
-            <span>{payment.customerEmail}</span>
-            <span>Retries: {payment.retryCount}/3</span>
-            <span>{daysSince(payment.createdAt)}d ago</span>
+            <span className="flex items-center gap-1">
+               {payment.customerEmail}
+            </span>
+            <span>Created {daysSince(payment.createdAt)}d ago</span>
+            {payment.status === 'pending' && (
+              <span className={cn(
+                "font-bold",
+                daysSince(payment.createdAt) > 7 ? "text-rose-500" : "text-stone-400"
+              )}>
+                Due in {daysSince(payment.createdAt)}d
+              </span>
+            )}
             {payment.paymentId && (
               <span className="font-mono text-[10px] text-stone-300">{payment.paymentId}</span>
             )}
@@ -63,37 +67,33 @@ export const PaymentRow: React.FC<PaymentRowProps> = React.memo(({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {payment.recoveryLinks?.[0] && (
-            <a
-              href={payment.recoveryLinks[0].url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              className="p-2 text-stone-400 hover:text-blue-600 rounded-lg hover:bg-blue-500/10 transition-all"
-              aria-label="Open payment link"
-              title="Open payment link"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          )}
-          {['pending', 'retrying'].includes(payment.status) && (
+          <button
+            onClick={e => { e.stopPropagation(); onView(payment.id); }}
+            className="p-2 text-stone-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-500/10 transition-all"
+            aria-label="View Invoice"
+            title="View Invoice"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
+          
+          {['pending', 'overdue'].includes(payment.status) && (
             isPaid ? (
               <button
                 onClick={e => { e.stopPropagation(); onRetry(payment.id); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-stone-600 dark:text-stone-300 border border-warm-border dark:border-stone-700 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-700 transition-all"
-                aria-label="Trigger retry now"
-                title="Trigger retry now"
+                aria-label="Send reminder"
+                title="Send reminder"
               >
-                <RotateCcw className="w-3 h-3" /> Retry
+                <RotateCcw className="w-3 h-3" /> Remind
               </button>
             ) : (
               <button
                 onClick={e => { e.stopPropagation(); onUpgrade(); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-stone-400 border border-dashed border-stone-300 dark:border-stone-600 rounded-lg hover:border-emerald-400 hover:text-emerald-600 transition-all"
-                aria-label="Upgrade to unlock auto-retry"
-                title="Upgrade to unlock auto-retry"
+                aria-label="Upgrade to unlock reminders"
+                title="Upgrade to unlock reminders"
               >
-                <Lock className="w-3 h-3" /> Retry
+                <Lock className="w-3 h-3" /> Remind
               </button>
             )
           )}

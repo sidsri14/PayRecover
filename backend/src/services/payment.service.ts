@@ -81,35 +81,44 @@ export const triggerManualRetry = async (userId: string, id: string) => {
   await prisma.failedPayment.update({ where: { id }, data: { nextRetryAt: new Date() } });
 };
 
-export const getPaymentMetrics = async (userId: string) => {
+/** Retrieves metrics for the dashboard focused on Invoices. */
+export const getInvoiceMetrics = async (userId: string) => {
   try {
     const now = new Date();
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [statsByStatus, monthRecovered] = await Promise.all([
+    const [statsByStatus, monthPaid] = await Promise.all([
       prisma.invoice.groupBy({
-        by: ['status'], where: { userId }, _sum: { amount: true }, _count: true 
+        by: ['status'],
+        where: { userId },
+        _sum: { amount: true },
+        _count: true 
       }),
-      prisma.invoice.aggregate({ where: { userId, status: 'paid', updatedAt: { gte: monthAgo } }, _sum: { amount: true } }),
+      prisma.invoice.aggregate({
+        where: { userId, status: 'paid', updatedAt: { gte: monthAgo } },
+        _sum: { amount: true }
+      }),
     ]);
 
-    const stats = Object.fromEntries(statsByStatus.map(s => [s.status, { sum: s._sum.amount ?? 0, count: s._count }]));
-    const totalInvoicedSum = Object.values(stats).reduce((acc, s) => acc + s.sum, 0);
-    const recoveredSum = stats['paid']?.sum ?? 0;
+    const stats = Object.fromEntries(statsByStatus.map(s => [s.status, { volume: s._sum.amount ?? 0, count: s._count }]));
+    const totalVolume = Object.values(stats).reduce((acc, s) => acc + s.volume, 0);
+    const paidVolume = stats['paid']?.volume ?? 0;
 
     return {
-      failedAmount: totalInvoicedSum,
-      recoveredAmount: recoveredSum,
-      recoveryRate: totalInvoicedSum > 0 ? Math.round((recoveredSum / totalInvoicedSum) * 1000) / 1000 : 0,
-      recoveredThisWeek: 0, // Placeholder
-      recoveredThisMonth: monthRecovered._sum.amount ?? 0,
-      recoveredViaLink: 0,
-      totalClicks: stats['overdue']?.count ?? 0, // Reuse for Overdue count in UI
-      counts: Object.fromEntries(Object.entries(stats).map(([k, v]) => [k, v.count])),
+      totalVolume,
+      paidVolume,
+      paidRate: totalVolume > 0 ? (paidVolume / totalVolume) : 0,
+      paidThisMonth: monthPaid._sum.amount ?? 0,
+      counts: {
+        pending: stats['pending']?.count ?? 0,
+        paid: stats['paid']?.count ?? 0,
+        overdue: stats['overdue']?.count ?? 0,
+        abandoned: stats['abandoned']?.count ?? 0,
+      }
     };
   } catch (err) {
     logger.error({ err }, 'Failed to compute invoice metrics');
-    return { ...ZERO_METRICS, counts: {} };
+    return { totalVolume: 0, paidVolume: 0, paidRate: 0, paidThisMonth: 0, counts: { pending: 0, paid: 0, overdue: 0, abandoned: 0 } };
   }
 };
 
@@ -122,21 +131,21 @@ export const getTimeseriesMetrics = async (userId: string, days = 30) => {
     select: { amount: true, status: true, createdAt: true }
   });
 
-  const timeseriesMap = new Map<string, { date: string, failed: number, recovered: number }>();
+  const timeseriesMap = new Map<string, { date: string, volume: number, paid: number }>();
   
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split('T')[0] as string;
-    timeseriesMap.set(dateStr, { date: dateStr, failed: 0, recovered: 0 });
+    timeseriesMap.set(dateStr, { date: dateStr, volume: 0, paid: 0 });
   }
 
-  invoices.forEach(p => {
-    const dateStr = p.createdAt.toISOString().split('T')[0] as string;
+  invoices.forEach(inv => {
+    const dateStr = inv.createdAt.toISOString().split('T')[0] as string;
     const stat = timeseriesMap.get(dateStr);
     if (stat) {
-      if (p.status === 'paid') stat.recovered += p.amount;
-      else stat.failed += p.amount;
+      stat.volume += inv.amount;
+      if (inv.status === 'paid') stat.paid += inv.amount;
     }
   });
 
@@ -144,22 +153,15 @@ export const getTimeseriesMetrics = async (userId: string, days = 30) => {
 };
 
 export const getFullDashboardStats = async (userId: string) => {
-  const m = await getPaymentMetrics(userId);
-  const counts = { pending: 0, paid: 0, overdue: 0, ...m.counts };
-
+  const m = await getInvoiceMetrics(userId);
   const timeseries = await getTimeseriesMetrics(userId, 30);
 
   return {
-    totalFailed: counts.pending || 0,
-    totalRecovered: counts.paid || 0,
-    recoveryRate: Math.round(m.recoveryRate * 1000) / 10, // decimal → percentage
-    totalFailedAmount: m.failedAmount,
-    totalRecoveredAmount: m.recoveredAmount,
-    recoveredThisWeek: m.recoveredThisWeek,
-    recoveredThisMonth: m.recoveredThisMonth,
-    totalClicks: m.totalClicks, // Using for Overdue Count UI
-    counts,
-    platformBreakdown: { mobile: 0, desktop: 0 },
+    totalVolume: m.totalVolume,
+    paidVolume: m.paidVolume,
+    paidRate: Math.round(m.paidRate * 1000) / 10, // decimal → percentage
+    paidThisMonth: m.paidThisMonth,
+    counts: m.counts,
     timeseries
   };
 };

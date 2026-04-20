@@ -11,11 +11,9 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import { rateLimit } from 'express-rate-limit';
 import authRoutes from './routes/auth.routes.js';
-import paymentRoutes from './routes/payment.routes.js';
-import webhookRoutes from './routes/webhook.routes.js';
 import billingRoutes from './routes/billing.routes.js';
 import teamRoutes from './routes/team.routes.js';
-import demoRoutes from './routes/demo.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import webhookEndpointRoutes from './routes/webhookEndpoints.routes.js';
 import apiKeyRoutes from './routes/apiKeys.routes.js';
@@ -195,10 +193,8 @@ app.get('/api/queue/stats', requireAuth, async (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/payments', paymentRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/team', teamRoutes);
-app.use('/api/demo', demoRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/webhook-endpoints', webhookEndpointRoutes);
 app.use('/api/api-keys', apiKeyRoutes);

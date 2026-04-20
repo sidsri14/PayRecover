@@ -148,14 +148,12 @@ export class StripeBillingService {
         // Handle one-off invoice payments
         const invoiceId = data.metadata?.invoiceId;
         const type = data.metadata?.type;
+        
         if (type === 'invoice' && invoiceId) {
           await prisma.invoice.update({
             where: { id: invoiceId },
             data: { status: 'paid' }
           });
-          
-          // Note: In a real app, you'd trigger a receipt email here.
-          // We'll handle this in the InvoiceService or a dedicated worker.
         }
         break;
       }

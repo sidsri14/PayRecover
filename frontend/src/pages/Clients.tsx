@@ -50,20 +50,39 @@ const Clients: FC = () => {
     }
   };
 
+  const [search, setSearch] = useState('');
+
+  const filteredClients = clients?.filter((c: any) => 
+    c.name.toLowerCase().includes(search.toLowerCase()) || 
+    c.email.toLowerCase().includes(search.toLowerCase())
+  ) || [];
+
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-stone-800 dark:text-stone-100 tracking-tight">Clients</h1>
           <p className="text-stone-400 text-sm mt-1">Manage your customer contact directory.</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="btn-primary"
-        >
-          <Plus className="w-5 h-5" />
-          Add Client
-        </button>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64 group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-emerald-500 transition-colors" />
+            <input
+              type="text"
+              placeholder="Search clients..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-11 pr-5 py-2.5 rounded-xl border border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium transition-all"
+            />
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn-primary shrink-0"
+          >
+            <Plus className="w-5 h-5" />
+            Add Client
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -72,31 +91,43 @@ const Clients: FC = () => {
             [...Array(3)].map((_, i) => (
               <div key={i} className="h-40 glass rounded-2xl animate-pulse" />
             ))
-          ) : !clients || clients.length === 0 ? (
+          ) : filteredClients.length === 0 ? (
             <div className="col-span-full py-20 text-center glass rounded-2xl">
               <User className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-              <h3 className="text-stone-400 font-bold uppercase tracking-widest">No clients yet</h3>
+              <h3 className="text-stone-400 font-bold uppercase tracking-widest">
+                {search ? 'No clients match your search' : 'No clients yet'}
+              </h3>
             </div>
           ) : (
-            clients.map((client: any) => (
+            filteredClients.map((client: any) => (
               <motion.div
                 key={client.id}
                 layout
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="glass-card group"
+                className="glass-card group relative"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="w-12 h-12 rounded-2xl bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-stone-400 group-hover:text-emerald-500 transition-colors">
                     <User className="w-6 h-6" />
                   </div>
-                  <button
-                    onClick={() => handleDelete(client.id)}
-                    className="p-2 text-stone-300 hover:text-rose-500 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => navigate(`/invoices/new?clientId=${client.id}`)}
+                      className="p-2 text-stone-300 hover:text-emerald-500 transition-colors"
+                      title="Create Invoice"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(client.id)}
+                      className="p-2 text-stone-300 hover:text-rose-500 transition-colors"
+                      title="Delete Client"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 
                 <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100">{client.name}</h3>

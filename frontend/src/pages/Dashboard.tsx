@@ -73,11 +73,11 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
   useEffect(() => {
     const handleFocus = () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['sources'] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     };
     
-    handleFocus(); // Initial mount refresh
+    handleFocus(); 
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [queryClient]);
@@ -85,21 +85,21 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
   const { search, statusFilter, sourceFilter, sortKey, sortDir, showUpgradeModal, lastFetchedAt, page } = state;
   const { setSearch, setStatusFilter, setSourceFilter, setSortKey, setSortDir, setShowUpgradeModal, setPage } = setters;
   const { plan, isPaid, stats, statsFetching, sources, paymentsPage, payments, isLoading, isFetching } = data;
-  const { upgradeMutation, retryMutation, simulateFailureMutation } = mutations;
+  const { upgradeMutation, sendReminderMutation } = mutations;
 
   const totalPages = paymentsPage?.pages ?? 1;
 
   // Derived logic
-  const lostAmount = (stats?.totalFailedAmount ?? 0) - (stats?.totalRecoveredAmount ?? 0);
-  const hasUnrecovered = lostAmount > 0;
-  const hasSources = sources.length > 0;
-  const hasFailure = payments.length > 0;
-  const hasRecovery = useMemo(() => payments.some((p: { status: string }) => p.status === 'recovered'), [payments]);
-  const onboardingComplete = hasSources && hasFailure && hasRecovery;
+  const unpaidVolume = stats?.totalVolume - stats?.paidVolume;
+  const hasUnpaid = unpaidVolume > 0;
+  const hasClients = sources.length > 0;
+  const hasInvoices = payments.length > 0;
+  const hasPaid = useMemo(() => payments.some((p: { status: string }) => p.status === 'paid'), [payments]);
+  const onboardingComplete = hasClients && hasInvoices && hasPaid;
 
-  const toggleSort = (key: 'status' | 'amount' | 'createdAt' | 'retryCount') => {
+  const toggleSort = (key: 'status' | 'amount' | 'createdAt' | 'dueDate') => {
     if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortDir('desc'); }
+    else { setSortKey(key as any); setSortDir('desc'); }
   };
 
   if (isLoading && payments.length === 0) {
@@ -134,19 +134,24 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-3xl font-bold text-stone-800 dark:text-stone-100 tracking-tight">
-                Recovery Dashboard
+                Invoices
               </h1>
               <PlanBadge plan={plan} />
             </div>
-            <p className="text-stone-400 text-xs font-medium tracking-wide">
-              Automatic failed payment recovery
+            <p className="text-stone-400 text-xs font-medium tracking-wide transition-all hover:text-stone-500 cursor-default">
+              Professional Invoicing & Payment Tracking
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => navigate('/invoices/new')}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+            >
+              New Invoice
+            </button>
             {(isFetching || statsFetching) && (
               <RefreshCw className="w-4 h-4 text-stone-400 animate-spin" />
             )}
-            <WorkerStatusBadge />
             <MonitoringBadge lastFetchedAt={lastFetchedAt} isFetching={isFetching || statsFetching} />
           </div>
         </div>
@@ -154,49 +159,16 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
         {/* ── Onboarding */}
         {!onboardingComplete && (
           <OnboardingChecklist
-            hasSources={hasSources}
-            hasFailure={hasFailure}
-            hasRecovery={hasRecovery}
+            hasSources={hasClients}
+            hasFailure={hasInvoices}
+            hasRecovery={hasPaid}
             plan={plan}
-            onOpenSources={() => navigate('/sources')}
-            onSimulate={() => simulateFailureMutation.mutate()}
+            onOpenSources={() => navigate('/clients')}
+            onSimulate={() => navigate('/invoices/new')}
             onUpgrade={() => setShowUpgradeModal(true)}
-            simulating={simulateFailureMutation.isPending}
+            simulating={false}
           />
         )}
-
-        {/* ── Hard Paywall */}
-        <AnimatePresence>
-          {!isPaid && hasUnrecovered && (
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl border-2 border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/10 p-5"
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-5 h-5 text-red-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-red-700 dark:text-red-400">
-                      You are losing {formatAmount(lostAmount)} right now.
-                    </p>
-                    <p className="text-xs text-red-600/70 dark:text-red-500/70 mt-0.5">
-                      PayRecover recovers money automatically on the Pro plan.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowUpgradeModal(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-bold rounded-xl transition-all"
-                >
-                  Upgrade to Recover
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <DashboardStats stats={stats} />
 
@@ -206,29 +178,17 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-emerald-500 transition-colors" />
             <input
               type="text"
-              placeholder="Search by customer, email or ID..."
+              placeholder="Search by client, description or amount..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search payments"
+              aria-label="Search invoices"
               className="w-full pl-11 pr-5 py-3 rounded-2xl border border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium transition-all"
             />
           </div>
 
-          <div className="flex items-center gap-3">
-            {isPaid && (
-              <button
-                onClick={() => window.open(`${api.defaults.baseURL}/payments/export`, '_blank')}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-            )}
-          </div>
-
           <div className="flex items-center gap-3 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
             <div className="flex bg-stone-100 dark:bg-stone-800 p-1 rounded-xl" role="tablist" aria-label="Filter by status">
-              {['ALL', 'PENDING', 'RETRYING', 'RECOVERED', 'ABANDONED'].map((s) => (
+              {['ALL', 'PENDING', 'PAID', 'OVERDUE'].map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
@@ -246,38 +206,18 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
               ))}
             </div>
 
-            <div className="flex bg-stone-100 dark:bg-stone-800 p-1 rounded-xl items-center">
-              <span className="text-[10px] uppercase font-semibold text-stone-400 px-2 italic">Source:</span>
+            <div className="flex bg-stone-100 dark:bg-stone-800 p-1 rounded-xl items-center shrink-0">
+              <span className="text-[10px] uppercase font-semibold text-stone-400 px-2 italic">Client:</span>
               <select
                 value={sourceFilter}
                 onChange={(e) => setSourceFilter(e.target.value)}
                 className="bg-transparent text-[10px] font-black uppercase tracking-widest outline-none pr-4 text-stone-800 dark:text-stone-100"
               >
-                <option value="ALL">All Sources</option>
+                <option value="ALL">All Clients</option>
                 {sources.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.name || s.type}</option>
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
-            </div>
-
-            <div className="border border-warm-border dark:border-stone-700 p-1 rounded-xl flex items-center gap-1.5 px-3 bg-white dark:bg-stone-800" role="group" aria-label="Sort by">
-              <span className="text-[10px] uppercase font-semibold text-stone-300 mr-1">Sort:</span>
-              {(['status', 'amount', 'createdAt', 'retryCount'] as const).map(key => (
-                <button
-                  key={key}
-                  onClick={() => toggleSort(key)}
-                  aria-pressed={sortKey === key}
-                  className={cn(
-                    'text-[10px] font-semibold tracking-wider uppercase px-2 py-1.5 rounded-lg transition-all',
-                    sortKey === key
-                      ? 'bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-200'
-                      : 'text-stone-300 hover:text-stone-600 dark:hover:text-stone-300'
-                  )}
-                >
-                  {key === 'createdAt' ? 'Date' : key === 'retryCount' ? 'Retries' : key}
-                  {sortKey === key && (sortDir === 'asc' ? ' ↑' : ' ↓')}
-                </button>
-              ))}
             </div>
           </div>
         </div>
@@ -286,29 +226,24 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
         <div className="glass rounded-2xl overflow-hidden shadow-2xl">
           {payments.length === 0 ? (
             <div className="p-20 text-center space-y-4">
-              <IndianRupee className="w-12 h-12 text-emerald-500 mx-auto opacity-20" />
-              <h3 className="text-xl font-black text-stone-300 uppercase">No Payments Found</h3>
+              <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto opacity-20" />
+              <h3 className="text-xl font-black text-stone-300 uppercase">No Invoices Found</h3>
             </div>
           ) : (
-            <ul className="divide-y divide-indigo-500/5 dark:divide-white/5" aria-label="Failed payment list">
+            <ul className="divide-y divide-indigo-500/5 dark:divide-white/5" aria-label="Invoice list">
               <AnimatePresence mode="popLayout">
-                {payments.map((payment: { 
-                  id: string; 
-                  status: string; 
-                  customerName?: string; 
-                  customerEmail: string; 
-                  amount: number; 
-                  currency: string; 
-                  retryCount: number; 
-                  createdAt: string 
-                }) => (
+                {payments.map((invoice: any) => (
                   <PaymentRow
-                    key={payment.id}
-                    payment={payment}
+                    key={invoice.id}
+                    payment={{
+                      ...invoice,
+                      customerName: invoice.client?.name,
+                      customerEmail: invoice.clientEmail
+                    }}
                     isPaid={isPaid}
-                    onRetry={(id) => retryMutation.mutate(id)}
+                    onRetry={(id) => sendReminderMutation.mutate(id)}
                     onUpgrade={() => setShowUpgradeModal(true)}
-                    onView={(id) => navigate(`/payments/${id}`)}
+                    onView={(id) => navigate(`/demo?id=${id}`)}
                   />
                 ))}
               </AnimatePresence>

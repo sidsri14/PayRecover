@@ -1,6 +1,6 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
-import { getPaymentMetrics, getFullDashboardStats } from '../services/payment.service.js';
+import { getFullDashboardStats, getInvoiceMetrics } from '../services/payment.service.js';
 import { successResponse } from '../utils/apiResponse.js';
 
 export const getDashboardStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -12,7 +12,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
 
 export const getMetrics = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const metrics = await getPaymentMetrics(req.userId!);
+    const metrics = await getInvoiceMetrics(req.userId!);
     successResponse(res, metrics);
   } catch (err) { next(err); }
 };

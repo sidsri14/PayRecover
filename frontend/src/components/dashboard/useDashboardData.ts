@@ -65,30 +65,30 @@ export function useDashboardData(currentUser: AuthUser | null) {
       return data.data;
     },
     refetchInterval: 30000,
-    staleTime: 5000, // Reduced for better reactivity
+    staleTime: 5000,
   });
 
-  // ── Sources
+  // ── Clients
   const { data: sources = [] } = useQuery({
-    queryKey: ['sources'],
+    queryKey: ['clients'],
     queryFn: async () => {
-      const { data } = await api.get('/sources');
+      const { data } = await api.get('/clients');
       return data.data;
     },
-    staleTime: 5000, // Reduced for better reactivity
+    staleTime: 5000,
   });
 
-  // ── Payments (paginated)
+  // ── Invoices (paginated)
   const { data: paymentsPage, isLoading, isFetching } = useQuery({
-    queryKey: ['payments', page, PAGE_SIZE, debouncedSearch, statusFilter, sourceFilter, sortKey, sortDir],
+    queryKey: ['invoices', page, PAGE_SIZE, debouncedSearch, statusFilter, sourceFilter, sortKey, sortDir],
     queryFn: async () => {
-      const { data } = await api.get('/payments', {
+      const { data } = await api.get('/invoices', {
         params: {
           page,
           limit: PAGE_SIZE,
           search: debouncedSearch || undefined,
           status: statusFilter === 'ALL' ? undefined : statusFilter.toLowerCase(),
-          sourceId: sourceFilter === 'ALL' ? undefined : sourceFilter,
+          clientId: sourceFilter === 'ALL' ? undefined : sourceFilter,
           sortKey,
           sortDir,
         },
@@ -106,7 +106,7 @@ export function useDashboardData(currentUser: AuthUser | null) {
     onSuccess: (response) => {
       const { url } = response.data.data;
       if (url) {
-        window.location.href = url; // Redirect to Stripe/Razorpay checkout
+        window.location.href = url;
       } else {
         toast.success('Pro plan activated!');
         setShowUpgradeModal(false);
@@ -116,32 +116,25 @@ export function useDashboardData(currentUser: AuthUser | null) {
     onError: () => toast.error('Upgrade failed'),
   });
 
-  const retryMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/payments/${id}/retry`),
+  const sendReminderMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/invoices/${id}/remind`),
     onSuccess: () => {
-      toast.success('Retry queued');
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast.success('Reminder email sent');
     },
-    onError: () => toast.error('Retry failed'),
+    onError: () => toast.error('Failed to send reminder'),
   });
 
-  const simulateFailureMutation = useMutation({
-    mutationFn: () => api.post('/demo/simulate-failure'),
-    onSuccess: () => {
-      toast.success('Demo failure created');
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-    },
-  });
-
-  const stats = statsData || { totalLost: 0, totalRecovered: 0, recoveredCount: 0, sourcesCount: 0 };
-  const payments = useMemo(() => paymentsPage?.payments || [], [paymentsPage?.payments]);
+  const stats = statsData || { totalVolume: 0, paidVolume: 0, paidRate: 0, counts: { pending: 0, paid: 0, overdue: 0 } };
+  const payments = useMemo(() => {
+    // If backend returns a flat array instead of { invoices: [] }, handle both
+    if (Array.isArray(paymentsPage)) return paymentsPage;
+    return paymentsPage?.invoices || paymentsPage || [];
+  }, [paymentsPage]);
 
   return {
     state: { page, search, statusFilter, sourceFilter, sortKey, sortDir, showUpgradeModal, lastFetchedAt },
     setters: { setPage, setSearch, setStatusFilter, setSourceFilter, setSortKey, setSortDir, setShowUpgradeModal },
     data: { user: currentUser, isPaid, plan, stats, statsFetching, sources, paymentsPage, payments, isLoading, isFetching },
-    mutations: { upgradeMutation, retryMutation, simulateFailureMutation }
+    mutations: { upgradeMutation, sendReminderMutation }
   };
 }

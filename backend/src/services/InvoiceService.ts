@@ -71,9 +71,11 @@ export class InvoiceService {
     await enqueueInvoiceReminder(invoice.id, 'reminder1', 3 * 24 * 60 * 60 * 1000);
     await enqueueInvoiceReminder(invoice.id, 'reminder2', 7 * 24 * 60 * 60 * 1000);
 
+    const updatedInvoice = await prisma.invoice.findUnique({ where: { id: invoice.id } });
+
     return {
       success: true,
-      invoiceId: invoice.id,
+      ...updatedInvoice,
       paymentUrl: stripeSession.url
     };
   }
