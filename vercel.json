@@ -6,17 +6,12 @@
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": { "distDir": "dist" }
-    },
-    {
-      "src": "api/index.ts",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "api/index.ts",
-      "check": true
+      "dest": "https://web-production-0b61b.up.railway.app/api/$1"
     },
     {
       "src": "/assets/(.*)",
