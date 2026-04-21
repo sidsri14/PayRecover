@@ -1,29 +1,34 @@
 import type { Request, Response, NextFunction } from 'express';
+import { prisma } from '../utils/prisma.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 
 export class DemoController {
   static async getInvoice(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-      
-      if (id === 'demo') {
-        const mockInvoice = {
-          id: 'demo-inv-123',
-          number: 'INV-DEMO-001',
-          description: 'Premium Web Design Services',
-          amount: 250000,
-          currency: 'INR',
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          clientEmail: 'client@example.com',
-          status: 'pending',
-          user: { name: 'Freelancer Pete' },
-          pdfUrl: '#'
-        };
-        return successResponse(res, mockInvoice);
-      }
+      const id = String(req.params.id);
 
-      // In a real app, you might fetch from DB, but for demo we just handle 'demo'
-      return errorResponse(res, 'Demo invoice not found', 404);
+      const invoice = await prisma.invoice.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          number: true,
+          description: true,
+          amount: true,
+          currency: true,
+          dueDate: true,
+          clientEmail: true,
+          status: true,
+          pdfUrl: true,
+          stripeCheckoutUrl: true,
+          paidAt: true,
+          user: { select: { name: true } },
+          client: { select: { name: true, company: true } },
+        },
+      });
+
+      if (!invoice) return errorResponse(res, 'Invoice not found', 404);
+
+      return successResponse(res, invoice);
     } catch (err) {
       next(err);
     }
@@ -31,8 +36,18 @@ export class DemoController {
 
   static async payInvoice(req: Request, res: Response, next: NextFunction) {
     try {
-      // Simulate checkout redirect
-      successResponse(res, { url: '/dashboard?demo=success' });
+      const id = String(req.params.id);
+
+      const invoice = await prisma.invoice.findUnique({
+        where: { id },
+        select: { stripeCheckoutUrl: true, status: true },
+      });
+
+      if (!invoice) return errorResponse(res, 'Invoice not found', 404);
+      if (invoice.status === 'PAID') return errorResponse(res, 'Invoice already paid', 400);
+      if (!invoice.stripeCheckoutUrl) return errorResponse(res, 'Payment link unavailable', 503);
+
+      return successResponse(res, { url: invoice.stripeCheckoutUrl });
     } catch (err) {
       next(err);
     }

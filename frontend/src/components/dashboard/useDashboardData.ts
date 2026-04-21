@@ -87,7 +87,7 @@ export function useDashboardData(currentUser: AuthUser | null) {
           page,
           limit: PAGE_SIZE,
           search: debouncedSearch || undefined,
-          status: statusFilter === 'ALL' ? undefined : statusFilter.toLowerCase(),
+          status: statusFilter === 'ALL' ? undefined : statusFilter,
           clientId: sourceFilter === 'ALL' ? undefined : sourceFilter,
           sortKey,
           sortDir,

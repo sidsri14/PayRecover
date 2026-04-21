@@ -83,7 +83,7 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
   const onboardingComplete = useMemo(() => {
     const hasClients = sources.length > 0;
     const hasInvoices = payments.length > 0;
-    const hasPaid = payments.some((p: { status: string }) => p.status === 'paid');
+    const hasPaid = payments.some((p: { status: string }) => p.status === 'PAID');
     return hasClients && hasInvoices && hasPaid;
   }, [sources, payments]);
 
@@ -165,7 +165,7 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
           <OnboardingChecklist
             hasSources={sources.length > 0}
             hasFailure={payments.length > 0}
-            hasRecovery={payments.some(p => p.status === 'paid')}
+            hasRecovery={payments.some(p => p.status === 'PAID')}
             plan={plan}
             onOpenSources={() => navigate('/clients')}
             onSimulate={() => navigate('/invoices/new')}
@@ -265,7 +265,7 @@ const Dashboard: FC<{ user: AuthUser }> = ({ user }) => {
                         isPaid={isPaid}
                         onRetry={(id) => sendReminderMutation.mutate(id)}
                         onUpgrade={() => setShowUpgradeModal(true)}
-                        onView={(id) => navigate(`/demo?id=${id}`)}
+                        onView={(id) => navigate(`/invoices/${id}`)}
                       />
                     ))}
                   </AnimatePresence>

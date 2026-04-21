@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 
 const Demo: FC = () => {
   const [searchParams] = useSearchParams();
-  const invoiceId = searchParams.get('invoice');
+  const invoiceId = searchParams.get('id') || searchParams.get('invoice');
   const [invoice, setInvoice] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +38,12 @@ const Demo: FC = () => {
         window.location.href = data.data.url;
       }
     } catch {
-      alert('Failed to initiate checkout.');
+      alert('Payment link unavailable. Please contact the sender.');
     }
+  };
+
+  const handleDownloadPdf = () => {
+    window.open(`/api/invoices/${invoiceId}/pdf`, '_blank');
   };
 
   if (loading) {
@@ -65,12 +69,11 @@ const Demo: FC = () => {
     );
   }
 
-  const isPaid = invoice.status === 'paid';
+  const isPaid = invoice.status === 'PAID';
 
   return (
     <div className="min-h-screen bg-cream selection:bg-emerald-100 selection:text-emerald-900 py-12 px-6">
       <div className="max-w-xl mx-auto space-y-8">
-        {/* Branding placeholder */}
         <div className="flex justify-center items-center gap-2 opacity-50">
            <div className="bg-stone-800 p-2 rounded-lg">
              <CheckCircle2 className="w-4 h-4 text-white" />
@@ -83,7 +86,6 @@ const Demo: FC = () => {
            animate={{ opacity: 1, y: 0 }}
            className="glass-card !p-0 overflow-hidden shadow-2xl"
         >
-          {/* Status Header */}
           <div className={`p-8 text-center text-white ${isPaid ? 'bg-emerald-500' : 'bg-stone-800'}`}>
              <h1 className="text-4xl font-black mb-2">{isPaid ? 'Invoice Paid' : formatAmount(invoice.amount)}</h1>
              <p className="font-bold uppercase tracking-widest text-[10px] opacity-70">
@@ -99,15 +101,16 @@ const Demo: FC = () => {
                    <p className="font-bold text-stone-800">{invoice.description}</p>
                 </div>
                 <div>
-                   <label className="text-[10px] font-black uppercase text-stone-400 block mb-1 text-right">Invoice ID</label>
-                   <p className="font-mono text-xs text-stone-500">#{invoice.id.slice(0, 8).toUpperCase()}</p>
+                   <label className="text-[10px] font-black uppercase text-stone-400 block mb-1 text-right">Invoice #</label>
+                   <p className="font-mono text-xs text-stone-500">{invoice.number}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-8 py-4">
                 <div>
                    <label className="text-[10px] font-black uppercase text-stone-400 block mb-1">Billed To</label>
-                   <p className="font-bold text-stone-800">{invoice.clientEmail}</p>
+                   <p className="font-bold text-stone-800">{invoice.client?.name || invoice.clientEmail}</p>
+                   {invoice.client?.company && <p className="text-xs text-stone-500">{invoice.client.company}</p>}
                 </div>
                 <div className="text-right">
                    <label className="text-[10px] font-black uppercase text-stone-400 block mb-1">Issued By</label>
@@ -123,10 +126,12 @@ const Demo: FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-emerald-900">Payment Confirmed</h3>
-                  <p className="text-sm text-emerald-700/70">A receipt has been sent to your email.</p>
+                  <p className="text-sm text-emerald-700/70">
+                    {invoice.paidAt ? `Paid on ${new Date(invoice.paidAt).toDateString()}` : 'A receipt has been sent to your email.'}
+                  </p>
                 </div>
                 <button
-                  onClick={() => window.open(invoice.pdfUrl, '_blank')}
+                  onClick={handleDownloadPdf}
                   className="flex items-center gap-2 text-emerald-700 font-bold text-sm bg-white px-6 py-2 rounded-xl shadow-sm hover:shadow-md transition-all"
                 >
                   <Download className="w-4 h-4" /> Download PDF
@@ -139,13 +144,13 @@ const Demo: FC = () => {
                   className="w-full btn-primary !py-5 justify-center flex items-center gap-3 text-lg shadow-xl shadow-emerald-500/20"
                 >
                   <CreditCard className="w-6 h-6" />
-                  Pay with Stripe
+                  Pay {formatAmount(invoice.amount)} with Stripe
                 </button>
                 <button
-                  onClick={() => window.open(invoice.pdfUrl, '_blank')}
+                  onClick={handleDownloadPdf}
                   className="w-full py-4 text-center text-stone-400 hover:text-stone-800 font-bold transition-all flex items-center justify-center gap-2"
                 >
-                  <Download className="w-4 h-4" /> Download Quote/Invoice PDF
+                  <Download className="w-4 h-4" /> Download Invoice PDF
                 </button>
               </div>
             )}

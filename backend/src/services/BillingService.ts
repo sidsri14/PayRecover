@@ -27,22 +27,6 @@ export class BillingService {
     }
 
     throw { status: 400, message: 'Razorpay subscriptions are no longer supported. Use Stripe billing.' };
-    const subscription = { id: '' }; // unreachable, satisfies type
-
-    await prisma.subscription.create({
-      data: {
-        userId,
-        providerSubscriptionId: subscription.id,
-        provider: 'razorpay',
-        plan,
-        status: 'created',
-      },
-    });
-
-    return {
-      subscriptionId: subscription.id,
-      checkoutUrl: (subscription as any).short_url,
-    };
   }
 
   /**

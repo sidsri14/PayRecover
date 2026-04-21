@@ -53,7 +53,7 @@ export const PaymentRow: React.FC<PaymentRowProps> = React.memo(({
                {payment.customerEmail}
             </span>
             <span>Created {daysSince(payment.createdAt)}d ago</span>
-            {payment.status === 'pending' && (
+            {payment.status === 'SENT' && (
               <span className={cn(
                 "font-bold",
                 daysSince(payment.createdAt) > 7 ? "text-rose-500" : "text-stone-400"
@@ -77,7 +77,7 @@ export const PaymentRow: React.FC<PaymentRowProps> = React.memo(({
             <ExternalLink className="w-4 h-4" />
           </button>
           
-          {['pending', 'overdue'].includes(payment.status) && (
+          {['SENT', 'OVERDUE'].includes(payment.status) && (
             isPaid ? (
               <button
                 onClick={e => { e.stopPropagation(); onRetry(payment.id); }}

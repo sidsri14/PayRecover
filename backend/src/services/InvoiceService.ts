@@ -29,7 +29,7 @@ export class InvoiceService {
     const invoice = await prisma.invoice.create({
       data: {
         userId,
-        clientId: (data.clientId as string) || '', 
+        clientId: data.clientId ?? (client?.id ?? ''),
         number: `INV-${Date.now()}`,
         clientEmail: data.clientEmail,
         description: data.description,
@@ -51,17 +51,19 @@ export class InvoiceService {
     const stripeSession = await StripeBillingService.createInvoiceSession(invoice, user);
 
     // 5. Update invoice with metadata
+    const checkoutUrl = stripeSession.checkoutUrl ?? null;
     await prisma.invoice.update({
       where: { id: invoice.id },
       data: {
         pdfUrl,
-        stripeSessionId: stripeSession.id
+        stripeSessionId: stripeSession.id,
+        stripeCheckoutUrl: checkoutUrl,
       }
     });
 
     // 6. Send Email via Resend
     const brandData = user.brandSettings ? JSON.parse(user.brandSettings) : {};
-    await sendInvoiceEmail(data.clientEmail, pdfUrl, stripeSession.checkoutUrl!, {
+    await sendInvoiceEmail(data.clientEmail, pdfUrl, checkoutUrl ?? pdfUrl, {
       ...invoice,
       dueDate: data.dueDate
     }, {

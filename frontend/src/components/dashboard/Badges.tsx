@@ -4,10 +4,11 @@ import { cn } from '../../utils/cn';
 
 export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const styles: Record<string, string> = {
-    pending:   'bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800',
-    retrying:  'bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800',
-    recovered: 'bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800',
-    abandoned: 'bg-stone-500/10 text-stone-500 border-stone-200 dark:border-stone-700',
+    DRAFT:     'bg-stone-500/10 text-stone-500 border-stone-200 dark:border-stone-700',
+    SENT:      'bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800',
+    PAID:      'bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800',
+    OVERDUE:   'bg-rose-500/10 text-rose-600 border-rose-200 dark:border-rose-800',
+    CANCELLED: 'bg-stone-500/10 text-stone-400 border-stone-200 dark:border-stone-700',
   };
   return (
     <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border', styles[status] || styles.pending)}>

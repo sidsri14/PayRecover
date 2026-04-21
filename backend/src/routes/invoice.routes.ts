@@ -1,15 +1,14 @@
 import { Router } from 'express';
 import { InvoiceController } from '../controllers/invoice.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import { csrfCheck } from '../middleware/csrf.middleware.js';
 
 const router = Router();
 
-router.use(requireAuth);
-
-router.post('/', InvoiceController.create);
-router.get('/', InvoiceController.list);
-router.get('/:id', InvoiceController.get);
-router.delete('/:id', InvoiceController.delete);
-router.get('/:id/pdf', InvoiceController.getPdf);
+router.post('/', requireAuth, csrfCheck, InvoiceController.create);
+router.get('/', requireAuth, InvoiceController.list);
+router.get('/:id', requireAuth, InvoiceController.get);
+router.delete('/:id', requireAuth, csrfCheck, InvoiceController.delete);
+router.get('/:id/pdf', requireAuth, InvoiceController.getPdf);
 
 export default router;
