@@ -218,3 +218,4 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
 });
 
 export { app };
+export default app;
