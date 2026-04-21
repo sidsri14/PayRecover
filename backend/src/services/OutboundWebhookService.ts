@@ -41,10 +41,11 @@ export class OutboundWebhookService {
 
     await Promise.allSettled(
       endpoints.map(ep =>
+        // secret is NOT included in the job payload — the processor fetches it
+        // from the DB at dispatch time to avoid storing signing keys in Redis.
         enqueueWebhookDelivery({
           endpointId: ep.id,
           url: ep.url,
-          secret: ep.secret,
           event,
           body,
         }).catch(err =>

@@ -8,16 +8,31 @@ const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: t
 const DISPATCH_TIMEOUT_MS = 10_000;
 
 export async function processWebhookDeliveryJob(job: Job): Promise<void> {
-  const { endpointId, url, secret, event, body } = job.data as {
+  const { endpointId, url, event, body } = job.data as {
     endpointId: string;
     url: string;
-    secret: string;
     event: string;
     body: string;
   };
 
+  // Fetch the signing secret from the DB at dispatch time — never stored in the
+  // job payload so Redis exposure doesn't leak merchant signing keys.
+  const endpoint = await prisma.webhookEndpoint.findUnique({
+    where: { id: endpointId },
+    select: { secret: true, active: true },
+  });
+
+  if (!endpoint) {
+    logger.warn({ endpointId }, '[Webhook] Endpoint no longer exists — dropping job');
+    return; // Don't retry; endpoint was deleted
+  }
+  if (!endpoint.active) {
+    logger.info({ endpointId }, '[Webhook] Endpoint deactivated — dropping job');
+    return;
+  }
+
   const attempt = (job.attemptsMade ?? 0) + 1;
-  const sig = `sha256=${crypto.createHmac('sha256', secret).update(body).digest('hex')}`;
+  const sig = `sha256=${crypto.createHmac('sha256', endpoint.secret).update(body).digest('hex')}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
 

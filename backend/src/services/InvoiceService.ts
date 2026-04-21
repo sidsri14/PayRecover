@@ -33,7 +33,8 @@ export class InvoiceService {
       });
     }
 
-    // 2. Create database record
+    // 2. Create DB record as DRAFT — promoted to SENT only after Stripe succeeds.
+    //    This prevents an orphaned SENT invoice with no payment link if Stripe fails.
     const invoice = await prisma.invoice.create({
       data: {
         userId,
@@ -44,17 +45,23 @@ export class InvoiceService {
         amount: data.amount,
         dueDate: data.dueDate,
         currency: data.currency || 'USD',
-        status: 'SENT'
+        status: 'DRAFT'
       }
     });
 
     // 3. PDF served on-demand at /api/invoices/:id/pdf (no upload step yet)
     const pdfUrl = `${process.env.BACKEND_URL ?? 'http://localhost:3000'}/api/invoices/${invoice.id}/pdf`;
 
-    // 4. Create Stripe Payment Link/Session
-    const stripeSession = await StripeBillingService.createInvoiceSession(invoice, user);
+    // 4. Create Stripe Payment Link/Session — clean up draft on failure
+    let stripeSession: { id: string; checkoutUrl: string | null };
+    try {
+      stripeSession = await StripeBillingService.createInvoiceSession(invoice, user);
+    } catch (stripeErr) {
+      await prisma.invoice.delete({ where: { id: invoice.id } }).catch(() => {});
+      throw stripeErr;
+    }
 
-    // 5. Update invoice with metadata
+    // 5. Update invoice: attach Stripe metadata and promote to SENT atomically
     const checkoutUrl = stripeSession.checkoutUrl ?? null;
     await prisma.invoice.update({
       where: { id: invoice.id },
@@ -62,6 +69,7 @@ export class InvoiceService {
         pdfUrl,
         stripeSessionId: stripeSession.id,
         stripeCheckoutUrl: checkoutUrl,
+        status: 'SENT',
       }
     });
 

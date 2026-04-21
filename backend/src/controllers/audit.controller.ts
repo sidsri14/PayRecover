@@ -5,8 +5,8 @@ import { successResponse } from '../utils/apiResponse.js';
 
 export const getAuditLogs = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 50;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
     const skip = (page - 1) * limit;
 
     const [logs, total] = await Promise.all([
@@ -30,6 +30,7 @@ export const exportAuditLogs = async (req: AuthRequest, res: Response, next: Nex
     const logs = await prisma.auditLog.findMany({
       where: { userId: req.userId! },
       orderBy: { createdAt: 'desc' },
+      take: 10_000, // guard against OOM on large audit trails
     });
 
     const escapeCSV = (val: string | null | undefined): string => {

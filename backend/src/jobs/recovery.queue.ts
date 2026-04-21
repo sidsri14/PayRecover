@@ -35,7 +35,8 @@ export async function enqueueRecoveryJob(failedPaymentId: string, delayMs = 0): 
 export interface WebhookDeliveryJobData {
   endpointId: string;
   url: string;
-  secret: string;
+  // secret intentionally omitted — fetched from DB at dispatch time to avoid
+  // storing signing keys in plaintext in the Redis job queue.
   event: string;
   body: string;
 }

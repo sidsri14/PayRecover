@@ -9,8 +9,8 @@ export class StripeProvider extends BaseProvider {
 
   async validateCredentials(credentials: any): Promise<boolean> {
     const { apiKey } = credentials;
-    // Bypass for E2E testing
-    if (apiKey?.includes('placeholder')) {
+    // Placeholder bypass only in non-production environments
+    if (process.env.NODE_ENV !== 'production' && apiKey?.includes('placeholder')) {
       return true;
     }
 
@@ -28,7 +28,7 @@ export class StripeProvider extends BaseProvider {
     const creds = typeof credentials === 'string' ? JSON.parse(credentials) : credentials;
     const { apiKey } = creds;
 
-    if (apiKey?.includes('placeholder') || !apiKey) {
+    if ((process.env.NODE_ENV !== 'production' && apiKey?.includes('placeholder')) || !apiKey) {
       return `https://checkout.stripe.com/mock_recovery_${failedPayment.id}`;
     }
 

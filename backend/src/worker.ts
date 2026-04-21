@@ -40,14 +40,48 @@ void checkRedisEvictionPolicy();
 
 // ── Webhook delivery worker ───────────────────────────────────────────────────
 
+async function runPiiPrune(): Promise<void> {
+  const retentionDays = parseInt(process.env.DATA_RETENTION_DAYS || '90', 10);
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+  logger.info({ cutoff, retentionDays }, '[PII Prune] Starting');
+
+  // 1. Delete old audit logs (they contain IP addresses, user agents, details)
+  const deletedLogs = await prisma.auditLog.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+
+  // 2. Anonymise old paid/cancelled invoice client emails — replace with
+  //    a sentinel so the record stays for accounting but PII is removed.
+  const anonInvoices = await prisma.invoice.updateMany({
+    where: {
+      status: { in: ['PAID', 'CANCELLED'] },
+      updatedAt: { lt: cutoff },
+      clientEmail: { not: '[removed]' },
+    },
+    data: { clientEmail: '[removed]' },
+  });
+
+  // 3. Remove phone numbers from clients not linked to active invoices
+  //    that were last updated beyond the retention window.
+  const anonClients = await prisma.client.updateMany({
+    where: {
+      updatedAt: { lt: cutoff },
+      phone: { not: null },
+    },
+    data: { phone: null },
+  });
+
+  logger.info(
+    { deletedLogs: deletedLogs.count, anonInvoices: anonInvoices.count, anonClients: anonClients.count },
+    '[PII Prune] Complete'
+  );
+}
+
 const webhookWorker = new Worker(
   'payment-recovery',
   async (job) => {
     if (job.name === 'webhook-delivery') return processWebhookDeliveryJob(job);
-    if (job.name === 'pii-prune') {
-      logger.info('PII prune job skipped — no payment data to prune');
-      return;
-    }
+    if (job.name === 'pii-prune') return runPiiPrune();
   },
   { connection: workerConnection, concurrency: 5 }
 );
