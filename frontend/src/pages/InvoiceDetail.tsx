@@ -129,9 +129,9 @@ const InvoiceDetail: FC = () => {
             Download PDF
           </button>
 
-          {invoice.stripeSessionId && invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
+          {invoice.stripeCheckoutUrl && invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
             <a
-              href={`/api/invoices/${id}/checkout`}
+              href={invoice.stripeCheckoutUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 font-bold text-sm text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 transition-all"

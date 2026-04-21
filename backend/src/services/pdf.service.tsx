@@ -31,8 +31,17 @@ const styles = StyleSheet.create({
   footer: { marginTop: 40, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 12, color: '#777', fontSize: 9 },
 });
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', INR: '₹', AUD: 'A$', CAD: 'C$', SGD: 'S$', AED: 'د.إ', MYR: 'RM', JPY: '¥',
+};
+
+function formatMoney(cents: number, currency: string) {
+  const symbol = CURRENCY_SYMBOLS[currency.toUpperCase()] ?? currency + ' ';
+  return `${symbol}${(cents / 100).toFixed(2)}`;
+}
+
 function InvoiceDocument({ invoice }: { invoice: InvoiceForPDF }) {
-  const total = (invoice.amount / 100).toFixed(2);
+  const currency = invoice.currency || 'USD';
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -81,14 +90,14 @@ function InvoiceDocument({ invoice }: { invoice: InvoiceForPDF }) {
             <View key={item.id} style={styles.tableRow}>
               <Text style={styles.col1}>{item.description}</Text>
               <Text style={styles.col2}>{item.quantity}</Text>
-              <Text style={styles.col3}>${(item.unitCents / 100).toFixed(2)}</Text>
-              <Text style={styles.col4}>${(item.totalCents / 100).toFixed(2)}</Text>
+              <Text style={styles.col3}>{formatMoney(item.unitCents, currency)}</Text>
+              <Text style={styles.col4}>{formatMoney(item.totalCents, currency)}</Text>
             </View>
           ))}
           <View style={styles.totalRow}>
             <Text style={[styles.col1, { flex: 5 }]} />
             <Text style={[styles.col4, styles.bold, { fontSize: 13 }]}>
-              ${total} {invoice.currency}
+              {formatMoney(invoice.amount, currency)}
             </Text>
           </View>
         </View>

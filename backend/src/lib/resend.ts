@@ -32,7 +32,7 @@ function getEmailTemplate(content: string, branding: BrandingContext) {
   // accentColor is validated to be a hex color (#rrggbb) before being stored,
   // so it is safe to interpolate directly. All other user-supplied fields use esc().
   const accent = /^#[0-9a-fA-F]{6}$/.test(branding.accentColor || '') ? branding.accentColor! : '#10b981';
-  const company = esc(branding.companyName || 'StripePay');
+  const company = esc(branding.companyName || 'StripeFlow');
   return `
     <div style="font-family: 'Inter', -apple-system, sans-serif; background: #f9fafb; padding: 40px 20px;">
       <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
@@ -74,7 +74,7 @@ export async function sendInvoiceEmail(to: string, pdfUrl: string, paymentUrl: s
   }
 
   if (!resend) throw new Error('Resend Not Initialized');
-  const safeName = sanitizeHeaderValue(branding.companyName || 'StripePay');
+  const safeName = sanitizeHeaderValue(branding.companyName || 'StripeFlow');
   const fromAddress = process.env.RESEND_FROM ?? 'noreply@stripeflow.app';
   const { data, error } = await resend.emails.send({
     from: `${safeName} <${fromAddress}>`,
@@ -105,6 +105,9 @@ export async function sendReminderEmail(to: string, invoice: any, branding: Bran
   }
 
   const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+  // Prefer the Stripe checkout URL so clients can pay without logging in.
+  // Fall back to the invoice detail page only if no payment link is available.
+  const paymentLink = invoice.stripeCheckoutUrl || `${frontendBase}/invoices/${invoice.id}`;
   const content = `
     <h2 style="margin-top: 0;">${esc(header)}</h2>
     <p>${message}</p>
@@ -112,7 +115,7 @@ export async function sendReminderEmail(to: string, invoice: any, branding: Bran
       <div style="margin-bottom: 8px; color: #b91c1c; font-size: 14px; font-weight: 600; text-transform: uppercase;">Amount Outstanding</div>
       <div style="font-size: 32px; font-weight: 800; color: #991b1b;">${esc(amount)} ${esc(invoice.currency || 'USD')}</div>
     </div>
-    <a href="${esc(frontendBase)}/invoice/${esc(invoice.id)}" style="display: block; width: 100%; box-sizing: border-box; background: ${accent}; color: #ffffff; padding: 16px; text-align: center; border-radius: 12px; font-weight: 800; text-decoration: none;">View &amp; Pay Now</a>
+    <a href="${esc(paymentLink)}" style="display: block; width: 100%; box-sizing: border-box; background: ${accent}; color: #ffffff; padding: 16px; text-align: center; border-radius: 12px; font-weight: 800; text-decoration: none;">View &amp; Pay Now</a>
   `;
 
   if (IS_MOCK) {
@@ -121,7 +124,7 @@ export async function sendReminderEmail(to: string, invoice: any, branding: Bran
   }
 
   if (!resend) throw new Error('Resend Not Initialized');
-  const safeName = sanitizeHeaderValue(branding.companyName || 'StripePay');
+  const safeName = sanitizeHeaderValue(branding.companyName || 'StripeFlow');
   const fromAddress = process.env.RESEND_FROM ?? 'noreply@stripeflow.app';
   const { data, error } = await resend.emails.send({
     from: `${safeName} <${fromAddress}>`,
@@ -154,7 +157,7 @@ export async function sendReceiptEmail(to: string, invoice: any, branding: Brand
   }
 
   if (!resend) throw new Error('Resend Not Initialized');
-  const safeName = sanitizeHeaderValue(branding.companyName || 'StripePay');
+  const safeName = sanitizeHeaderValue(branding.companyName || 'StripeFlow');
   const fromAddress = process.env.RESEND_FROM ?? 'noreply@stripeflow.app';
   const { data, error } = await resend.emails.send({
     from: `${safeName} <${fromAddress}>`,

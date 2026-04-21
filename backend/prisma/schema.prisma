@@ -28,7 +28,7 @@ model User {
   auditLogs             AuditLog[]
   webhookEndpoints      WebhookEndpoint[]
   apiKeys               ApiKey[]
-  brandSettings         String?         // JSON: { logoUrl, primaryColor, accentColor, companyName, emailSignature }
+  brandSettings         String?         // JSON: { logoUrl, accentColor, companyName, showLogo, signature }
   brandEmailSubject     String?         // Custom recovery subject
   brandEmailTone        String?         @default("professional") // professional | friendly | urgent
   clients               Client[]
@@ -40,7 +40,7 @@ model Subscription {
   userId              String
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   providerSubscriptionId String @unique // Genericized from razorpaySubscriptionId
-  provider            String   @default("razorpay")
+  provider            String   @default("stripe")
   plan                String   // "starter" | "pro"
   status              String   @default("created") // created | authenticated | active | cancelled | completed
   currentPeriodStart  DateTime?
@@ -173,6 +173,7 @@ model Invoice {
 
   @@unique([userId, number])
   @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
   @@index([userId, status])
   @@index([status, dueDate])
 }

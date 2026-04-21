@@ -115,17 +115,28 @@ const CreateInvoice: FC = () => {
 
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-stone-400 flex items-center gap-1.5">
-              <DollarSign className="w-3 h-3" /> Amount (USD)
+              <DollarSign className="w-3 h-3" /> Amount
             </label>
-            <input
-              type="number"
-              step="0.01"
-              required
-              placeholder="0.00"
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-stone-100 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
-            />
+            <div className="flex gap-2">
+              <select
+                value={formData.currency}
+                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                className="px-3 py-3 rounded-xl border border-stone-100 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold"
+              >
+                {['USD','EUR','GBP','INR','AUD','CAD','SGD','AED','MYR','JPY'].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                step="0.01"
+                required
+                placeholder="0.00"
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                className="flex-1 px-4 py-3 rounded-xl border border-stone-100 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

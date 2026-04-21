@@ -67,11 +67,12 @@ export const updatePlan = async (req: AuthRequest, res: Response, next: NextFunc
       return errorResponse(res, 'Not available', 404);
     }
 
+    const providedBuf = (!providedSecret || typeof providedSecret !== 'string') ? null : Buffer.from(providedSecret);
+    const adminBuf = Buffer.from(adminSecret);
     if (
-      !providedSecret ||
-      typeof providedSecret !== 'string' ||
-      providedSecret.length !== adminSecret.length ||
-      !crypto.timingSafeEqual(Buffer.from(providedSecret), Buffer.from(adminSecret))
+      !providedBuf ||
+      providedBuf.byteLength !== adminBuf.byteLength ||
+      !crypto.timingSafeEqual(providedBuf, adminBuf)
     ) {
       return errorResponse(res, 'Forbidden', 403);
     }

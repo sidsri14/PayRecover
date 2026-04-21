@@ -49,8 +49,8 @@ export async function processWebhookDeliveryJob(job: Job): Promise<void> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-stripepay-signature': sig,
-        'x-stripepay-event': event,
+        'x-stripeflow-signature': sig,
+        'x-stripeflow-event': event,
       },
       body,
       signal: controller.signal,

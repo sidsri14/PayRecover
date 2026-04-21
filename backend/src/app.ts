@@ -157,7 +157,7 @@ app.get('/health', async (_req, res) => {
   checks.stripe = stripeKey.startsWith('sk_') ? 'configured' : 'missing';
   if (checks.stripe === 'missing') healthy = false;
 
-  res.status(200).json({
+  res.status(healthy ? 200 : 503).json({
     status: healthy ? 'ok' : 'degraded',
     version: '1.0.0',
     timestamp: new Date().toISOString(),

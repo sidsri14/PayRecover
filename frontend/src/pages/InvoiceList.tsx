@@ -2,7 +2,7 @@ import { type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, FileText, ExternalLink, Trash2, Clock } from 'lucide-react';
-import { api } from '../api';
+import { api, API_URL } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatAmount } from '../utils/format';
 import { cn } from '../utils/cn';
@@ -133,7 +133,7 @@ const InvoiceList: FC = () => {
                             <FileText className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); window.open(`/api/invoices/${invoice.id}/pdf`, '_blank'); }}
+                            onClick={(e) => { e.stopPropagation(); window.open(`${API_URL}/invoices/${invoice.id}/pdf`, '_blank'); }}
                             className="p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400 hover:text-emerald-500 transition-all"
                             title="Download PDF"
                           >
