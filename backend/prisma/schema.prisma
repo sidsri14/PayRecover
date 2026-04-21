@@ -161,6 +161,7 @@ model Invoice {
   pdfUrl                String?
   dueDate               DateTime
   stripeSessionId       String?
+  stripeCheckoutUrl     String?
   stripePaymentIntentId String?
   remindersSent         Int           @default(0)
   paidAt                DateTime?

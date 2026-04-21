@@ -59,7 +59,7 @@ webhookWorker.on('failed', (job, err) => {
 
 // ── Heartbeat ─────────────────────────────────────────────────────────────────
 
-const HEARTBEAT_KEY = 'stripepay:worker:heartbeat';
+const HEARTBEAT_KEY = 'stripeflow:worker:heartbeat';
 const HEARTBEAT_INTERVAL_MS = 60_000;
 
 const writeHeartbeat = () =>
