@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Shield, CreditCard, Check, Zap, User, Loader2, Link2, Palette, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -13,6 +14,7 @@ interface Props {
 }
 
 const Settings: FC<Props> = ({ user, onUpdateUser }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [profileForm, setProfileForm] = useState({ 
     name: user.name || '', 
@@ -45,10 +47,10 @@ const Settings: FC<Props> = ({ user, onUpdateUser }) => {
     staleTime: 60_000,
   });
 
-  const handleCheckout = async (plan: 'starter' | 'pro', gateway: 'stripe' | 'razorpay' = 'stripe') => {
+  const handleCheckout = async (plan: 'starter' | 'pro') => {
     setLoading(true);
     try {
-      const { data } = await api.post('/billing/create-subscription', { plan, gateway });
+      const { data } = await api.post('/billing/create-subscription', { plan });
       if (data.success && data.data.checkoutUrl) {
         window.location.href = data.data.checkoutUrl;
       } else {

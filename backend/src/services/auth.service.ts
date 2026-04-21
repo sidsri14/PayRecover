@@ -58,16 +58,20 @@ export const verifyUserEmail = async (token: string) => {
   return { message: 'Verified!' };
 };
 
+// Minimum wall-clock ms for requestPassReset regardless of branch taken.
+// Prevents email enumeration via response-time differences.
+const RESET_MIN_MS = 500;
+
 export const requestPassReset = async (email: string) => {
+  const startMs = Date.now();
+
   const u = await prisma.user.findUnique({ where: { email } });
-  
-  // Timing-safe response: Always act as if email was sent if address is valid format
-  // We avoid returning early to prevent timing enumeration
+
   if (u) {
     const rToken = crypto.randomBytes(32).toString('hex');
-    await prisma.user.update({ 
-      where: { id: u.id }, 
-      data: { passwordResetToken: rToken, passwordResetExpiry: new Date(Date.now() + RESET_EXPIRY_MINUTES * 60000) } 
+    await prisma.user.update({
+      where: { id: u.id },
+      data: { passwordResetToken: rToken, passwordResetExpiry: new Date(Date.now() + RESET_EXPIRY_MINUTES * 60000) }
     });
 
     sendPasswordResetEmail(email, {
@@ -76,9 +80,13 @@ export const requestPassReset = async (email: string) => {
     }).catch(e => logger.error(e));
 
     await logAuditAction(u.id, 'PASSWORD_RESET_REQUESTED', 'User', u.id);
-  } else {
-    // Dummy wait to simulate DB operations and email setup
-    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  // Constant-time pad: both branches always take at least RESET_MIN_MS so an
+  // attacker cannot enumerate registered emails by wall-clock difference.
+  const elapsed = Date.now() - startMs;
+  if (elapsed < RESET_MIN_MS) {
+    await new Promise(resolve => setTimeout(resolve, RESET_MIN_MS - elapsed));
   }
 
   return { message: 'Check your email' };

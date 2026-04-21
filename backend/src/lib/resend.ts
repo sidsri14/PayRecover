@@ -75,8 +75,9 @@ export async function sendInvoiceEmail(to: string, pdfUrl: string, paymentUrl: s
 
   if (!resend) throw new Error('Resend Not Initialized');
   const safeName = sanitizeHeaderValue(branding.companyName || 'StripePay');
+  const fromAddress = process.env.RESEND_FROM ?? 'noreply@stripeflow.app';
   const { data, error } = await resend.emails.send({
-    from: `${safeName} <onboarding@resend.dev>`,
+    from: `${safeName} <${fromAddress}>`,
     to,
     subject: `Invoice: ${sanitizeHeaderValue(invoice.description)} - ${amount} ${invoice.currency || 'USD'}`,
     html: getEmailTemplate(content, branding)
@@ -121,8 +122,9 @@ export async function sendReminderEmail(to: string, invoice: any, branding: Bran
 
   if (!resend) throw new Error('Resend Not Initialized');
   const safeName = sanitizeHeaderValue(branding.companyName || 'StripePay');
+  const fromAddress = process.env.RESEND_FROM ?? 'noreply@stripeflow.app';
   const { data, error } = await resend.emails.send({
-    from: `${safeName} <reminders@yourdomain.com>`,
+    from: `${safeName} <${fromAddress}>`,
     to,
     subject: `${tone === 'urgent' ? 'URGENT: ' : ''}Payment Reminder for ${sanitizeHeaderValue(invoice.description)}`,
     html: getEmailTemplate(content, branding)
@@ -152,8 +154,10 @@ export async function sendReceiptEmail(to: string, invoice: any, branding: Brand
   }
 
   if (!resend) throw new Error('Resend Not Initialized');
+  const safeName = sanitizeHeaderValue(branding.companyName || 'StripePay');
+  const fromAddress = process.env.RESEND_FROM ?? 'noreply@stripeflow.app';
   const { data, error } = await resend.emails.send({
-    from: `${branding.companyName || 'StripePay'} <receipts@yourdomain.com>`,
+    from: `${safeName} <${fromAddress}>`,
     to,
     subject: `Payment received - Thank you!`,
     html: getEmailTemplate(content, branding)

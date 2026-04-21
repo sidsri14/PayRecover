@@ -31,18 +31,30 @@ export const handleStripeInvoiceWebhook = async (req: Request, res: Response) =>
     const session = event.data.object as Stripe.Checkout.Session;
     const invoiceId = session.metadata?.invoiceId;
     if (invoiceId && session.payment_intent) {
-      const updated = await prisma.invoice.update({
-        where: { id: invoiceId },
+      // updateMany guards against: replayed events, already-PAID, and CANCELLED invoices.
+      // stripeSessionId match ensures we only act on our own session, not a stale one.
+      const { count } = await prisma.invoice.updateMany({
+        where: {
+          id: invoiceId,
+          stripeSessionId: session.id,
+          status: { notIn: ['PAID', 'CANCELLED'] },
+        },
         data: {
-          status: 'PAID' as const,
+          status: 'PAID',
           paidAt: new Date(),
           stripePaymentIntentId: session.payment_intent as string,
         },
       });
-      try {
-        await sendReceiptEmail(updated.clientEmail, updated);
-      } catch {
-        // receipt email failure should not break webhook ack
+
+      if (count > 0) {
+        const updated = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+        if (updated) {
+          try {
+            await sendReceiptEmail(updated.clientEmail, updated);
+          } catch {
+            // receipt email failure must not fail webhook ack
+          }
+        }
       }
     }
   }

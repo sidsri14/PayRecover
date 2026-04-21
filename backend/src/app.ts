@@ -21,7 +21,7 @@ import contactRoutes from './routes/contact.routes.js';
 import invoiceRoutes from './routes/invoice.routes.js';
 import clientRoutes from './routes/client.routes.js';
 import { Queue } from 'bullmq';
-import { billingWebhook, stripeBillingWebhook } from './controllers/billing.controller.js';
+import { stripeBillingWebhook } from './controllers/billing.controller.js';
 import { handleStripeInvoiceWebhook } from './controllers/webhook.controller.js';
 import { requireAuth } from './middleware/auth.middleware.js';
 import { prisma } from './utils/prisma.js';
@@ -83,7 +83,6 @@ app.use(cors({
 }));
 
 // ── Webhook Routes (Raw Body Required)
-app.post('/api/webhooks/billing/razorpay', express.raw({ type: 'application/json' }), billingWebhook);
 app.post('/api/webhooks/billing/stripe', express.raw({ type: 'application/json' }), stripeBillingWebhook);
 app.post('/api/webhooks/stripe/invoice', express.raw({ type: 'application/json' }), handleStripeInvoiceWebhook);
 

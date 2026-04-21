@@ -14,9 +14,8 @@ const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: t
  */
 export const createSubscription = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { plan, gateway } = req.body; // "starter" or "pro", "razorpay" or "stripe"
-
-    const result = await BillingService.createSubscription(req.userId!, plan as 'starter' | 'pro', gateway);
+    const { plan } = req.body;
+    const result = await BillingService.createSubscription(req.userId!, plan as 'starter' | 'pro');
     successResponse(res, result);
   } catch (err) {
     next(err);
@@ -85,46 +84,6 @@ export const updatePlan = async (req: AuthRequest, res: Response, next: NextFunc
       select: { id: true, email: true, plan: true, createdAt: true },
     });
     successResponse(res, { user });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * Public webhook endpoint for Razorpay subscription events.
- * Securely verified with 'x-razorpay-signature'.
- */
-export const billingWebhook = async (req: any, res: Response, next: NextFunction) => {
-  try {
-    const sig = req.headers['x-razorpay-signature'];
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-
-    if (typeof sig !== 'string' || !webhookSecret) {
-      logger.warn('[Billing Webhook] Missing signature or webhook secret not configured');
-      return errorResponse(res, 'Invalid signature', 400);
-    }
-
-    const rawBody = (req.body as Buffer).toString('utf8');
-    logger.debug({ secret_len: webhookSecret.length }, '[Billing Webhook] Received');
-
-    const expectedSig = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
-    const isValid = crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig));
-    logger.debug({ isValid }, '[Billing Webhook] Signature check result');
-
-    if (!isValid) {
-      return errorResponse(res, 'Invalid signature', 400);
-    }
-
-    let event: any;
-    try {
-      event = JSON.parse(rawBody);
-    } catch {
-      logger.warn('[Billing Webhook] Malformed JSON body');
-      return errorResponse(res, 'Invalid request body', 400);
-    }
-    await BillingService.handleSubscriptionWebhook(event);
-
-    successResponse(res, { success: true });
   } catch (err) {
     next(err);
   }

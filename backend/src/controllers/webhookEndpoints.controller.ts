@@ -1,49 +1,10 @@
 import crypto from 'crypto';
-import dns from 'dns/promises';
-import net from 'net';
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
 import { z } from 'zod';
 import { prisma } from '../utils/prisma.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
-
-const PRIVATE_RANGES = [
-  /^127\./,                        // loopback
-  /^10\./,                         // RFC-1918
-  /^172\.(1[6-9]|2\d|3[01])\./,   // RFC-1918
-  /^192\.168\./,                   // RFC-1918
-  /^169\.254\./,                   // link-local (AWS metadata etc.)
-  /^::1$/,                         // IPv6 loopback
-  /^fc00:/,                        // IPv6 unique-local
-  /^fe80:/,                        // IPv6 link-local
-];
-
-async function isPrivateUrl(rawUrl: string): Promise<boolean> {
-  try {
-    const { hostname, protocol } = new URL(rawUrl);
-
-    // Only allow http/https — block file://, ftp://, etc.
-    if (protocol !== 'http:' && protocol !== 'https:') return true;
-
-    if (net.isIP(hostname)) {
-      return PRIVATE_RANGES.some(r => r.test(hostname));
-    }
-
-    // Resolve both A (IPv4) and AAAA (IPv6) records
-    const [v4, v6] = await Promise.all([
-      dns.resolve4(hostname).catch(() => [] as string[]),
-      dns.resolve6(hostname).catch(() => [] as string[]),
-    ]);
-    const ips = [...v4, ...v6];
-
-    // If DNS returned no records at all, treat as unsafe
-    if (ips.length === 0) return true;
-
-    return ips.some(ip => PRIVATE_RANGES.some(r => r.test(ip)));
-  } catch {
-    return true; // treat unresolvable as unsafe
-  }
-}
+import { isPrivateUrl } from '../utils/isPrivateUrl.js';
 
 const VALID_EVENTS = [
   'payment.failed',

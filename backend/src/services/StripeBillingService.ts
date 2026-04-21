@@ -4,8 +4,13 @@ import { prisma } from '../utils/prisma.js';
 let _stripe: Stripe | null = null;
 const getStripe = () => {
   const secret = process.env.STRIPE_PLATFORM_SECRET_KEY;
-  if (!secret || secret.includes('xxxx')) {
-    console.warn('[STRIPE MOCK] STRIPE_PLATFORM_SECRET_KEY is missing or dummy. Returning mock.');
+  const isMockKey = !secret || secret.includes('xxxx');
+
+  if (isMockKey) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('[Stripe] STRIPE_PLATFORM_SECRET_KEY is not configured. Refusing to use mock in production.');
+    }
+    console.warn('[STRIPE MOCK] STRIPE_PLATFORM_SECRET_KEY is missing or dummy. Returning mock (dev only).');
     return {
       checkout: {
         sessions: {
@@ -16,11 +21,11 @@ const getStripe = () => {
         }
       },
       webhooks: {
-        constructEvent: () => ({ type: 'mock.event' } as any)
+        constructEvent: () => { throw new Error('Mock cannot verify real webhook signatures'); }
       }
     } as any;
   }
-  
+
   if (!_stripe) {
     _stripe = new Stripe(secret, {
       apiVersion: '2023-10-16' as any,

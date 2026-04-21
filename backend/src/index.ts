@@ -36,6 +36,12 @@ function validateEnv(): void {
     process.exit(1);
   }
 
+  const encKey = process.env.ENCRYPTION_KEY!;
+  if (!/^[0-9a-fA-F]{64}$/.test(encKey)) {
+    console.error('[Startup] ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes for AES-256). Generate with: openssl rand -hex 32');
+    process.exit(1);
+  }
+
   // Warn about optional vars that degrade functionality
   const missingOptional = OPTIONAL_ENV.filter(({ key }) => !process.env[key]);
   if (missingOptional.length > 0) {

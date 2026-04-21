@@ -35,7 +35,9 @@ export const exportAuditLogs = async (req: AuthRequest, res: Response, next: Nex
 
     const escapeCSV = (val: string | null | undefined): string => {
       if (!val) return '""';
-      return `"${val.replace(/"/g, '""')}"`;
+      // Prefix cells that start with formula-trigger chars so Excel/Sheets won't execute them
+      const safe = /^[=+\-@]/.test(val) ? `'${val}` : val;
+      return `"${safe.replace(/"/g, '""')}"`;
     };
 
     let csv = 'ID,Action,Resource,Resource ID,Details,Date\n';

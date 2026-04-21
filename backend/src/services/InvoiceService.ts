@@ -74,7 +74,8 @@ export class InvoiceService {
     });
 
     // 6. Send Email via Resend
-    const brandData = user.brandSettings ? JSON.parse(user.brandSettings) : {};
+    let brandData: Record<string, string> = {};
+    try { brandData = user.brandSettings ? JSON.parse(user.brandSettings) : {}; } catch { /* malformed JSON — use defaults */ }
     await sendInvoiceEmail(data.clientEmail, pdfUrl, checkoutUrl ?? pdfUrl, {
       ...invoice,
       dueDate: data.dueDate

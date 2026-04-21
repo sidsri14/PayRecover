@@ -2,6 +2,7 @@ import type { Job } from 'bullmq';
 import crypto from 'crypto';
 import pino from 'pino';
 import { prisma } from '../utils/prisma.js';
+import { isPrivateUrl } from '../utils/isPrivateUrl.js';
 
 const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: true } } });
 
@@ -28,6 +29,13 @@ export async function processWebhookDeliveryJob(job: Job): Promise<void> {
   }
   if (!endpoint.active) {
     logger.info({ endpointId }, '[Webhook] Endpoint deactivated — dropping job');
+    return;
+  }
+
+  // Re-validate at dispatch time to defeat DNS-rebinding: attacker's domain may have
+  // returned a public IP during webhook creation but now resolves to a private IP.
+  if (await isPrivateUrl(url)) {
+    logger.warn({ endpointId, url }, '[Webhook] URL resolves to private IP at dispatch time — dropping');
     return;
   }
 
