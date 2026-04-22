@@ -47,8 +47,9 @@ const Clients: FC = () => {
       await api.delete(`/clients/${id}`);
       toast.success('Client removed');
       refetch();
-    } catch {
-      toast.error('Failed to remove client');
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to remove client';
+      toast.error(msg);
     }
   };
 

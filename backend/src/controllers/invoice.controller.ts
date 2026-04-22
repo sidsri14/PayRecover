@@ -25,7 +25,7 @@ export class InvoiceController {
     try {
       const parsed = invoiceCreateSchema.safeParse(req.body);
       if (!parsed.success) {
-        return errorResponse(res, parsed.error.errors[0].message, 400);
+        return errorResponse(res, parsed.error.issues[0]?.message ?? 'Invalid request', 400);
       }
 
       const { clientId, clientEmail, description, amount, dueDate, currency } = parsed.data;

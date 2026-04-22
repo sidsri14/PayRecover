@@ -24,8 +24,9 @@ const InvoiceList: FC = () => {
       await api.delete(`/invoices/${id}`);
       toast.success('Invoice deleted');
       refetch();
-    } catch {
-      toast.error('Failed to delete invoice');
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to delete invoice';
+      toast.error(msg);
     }
   };
 
