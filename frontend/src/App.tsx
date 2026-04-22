@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
+import { ScrollToTop } from './components/common/ScrollToTop';
 
 import { LogOut, TrendingUp, Link2, Loader2, Settings as SettingsIcon, Menu, X, Users } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
@@ -286,6 +287,7 @@ function App() {
   return (
     <ErrorBoundary>
       <Router>
+        <ScrollToTop />
         <PageTitle />
         <Toaster
           position="top-right"
