@@ -269,9 +269,9 @@ const Branding: FC = () => {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-4 shadow-xl">
+                <div className="bg-white dark:bg-stone-800 rounded-2xl p-4 shadow-xl border border-stone-200 dark:border-stone-700">
                   <div className="flex flex-col items-center gap-3 py-4">
-                    <div className="w-12 h-12 bg-stone-100 rounded-xl flex items-center justify-center overflow-hidden">
+                    <div className="w-12 h-12 bg-stone-100 dark:bg-stone-700 rounded-xl flex items-center justify-center overflow-hidden">
                       {settings.logoUrl ? (
                         <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain p-1"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -279,11 +279,11 @@ const Branding: FC = () => {
                         <Building2 className="w-6 h-6 text-stone-400" />
                       )}
                     </div>
-                    <p className="text-sm font-black text-stone-800">{settings.companyName || 'Your Brand'}</p>
-                    <div className="h-2 w-3/4 bg-stone-100 rounded-full" />
-                    <div className="h-2 w-1/2 bg-stone-100 rounded-full" />
+                    <p className="text-sm font-black text-stone-800 dark:text-stone-100">{settings.companyName || 'Your Brand'}</p>
+                    <div className="h-2 w-3/4 bg-stone-100 dark:bg-stone-700 rounded-full" />
+                    <div className="h-2 w-1/2 bg-stone-100 dark:bg-stone-700 rounded-full" />
                     <div
-                      className="w-full h-8 rounded-lg mt-2 flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-white shadow-lg mx-auto"
+                      className="w-full h-8 rounded-lg mt-2 flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-white shadow-lg mx-auto drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
                       style={{ backgroundColor: settings.accentColor }}
                     >
                       Pay Now

@@ -29,6 +29,12 @@ const Register: React.FC<Props> = ({ onRegisterSuccess }) => {
   const [searchParams] = useSearchParams();
   const oauthError = searchParams.get('error') === 'oauth_failed' || searchParams.get('error') === 'oauth_state_mismatch';
 
+  React.useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', isDark);
+  }, []);
+
   const allRulesMet = PASSWORD_RULES.every(r => r.test(password));
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -205,7 +211,7 @@ const Register: React.FC<Props> = ({ onRegisterSuccess }) => {
 
           <footer className="mt-8 text-center border-t border-warm-border dark:border-stone-700 pt-6">
             <p className="text-sm text-stone-400">
-              Have an account? <Link to="/login" className="text-stone-600 dark:text-stone-300 hover:underline font-semibold ml-1">Sign In</Link>
+              Have an account? <Link to="/login" replace className="text-stone-600 dark:text-stone-300 hover:underline font-semibold ml-1">Sign In</Link>
             </p>
           </footer>
         </div>

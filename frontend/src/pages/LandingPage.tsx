@@ -54,8 +54,8 @@ const LandingPage: FC = () => {
           
           <div className="flex items-center gap-4 sm:gap-8">
             <ThemeToggle />
-            <button onClick={() => navigate('/login')} className="nav-link hidden md:block">Sign In</button>
-            <button onClick={() => navigate('/register')} className="btn-primary !px-6 !py-3">Start Free</button>
+            <button onClick={() => navigate('/login', { replace: true })} className="nav-link hidden md:block">Sign In</button>
+            <button onClick={() => navigate('/register', { replace: true })} className="btn-primary !px-6 !py-3">Start Free</button>
           </div>
         </div>
       </nav>
@@ -98,7 +98,7 @@ const LandingPage: FC = () => {
               className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-8"
             >
               <button 
-                onClick={() => navigate('/register')} 
+                onClick={() => navigate('/register', { replace: true })} 
                 className="btn-primary !px-12 !py-6 !text-[13px] shadow-2xl shadow-emerald-500/20 group hover:scale-105 active:scale-95"
               >
                 Initialize Your Engine <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
@@ -179,7 +179,7 @@ const LandingPage: FC = () => {
                 ))}
               </div>
               <button 
-                onClick={() => navigate('/register')} 
+                onClick={() => navigate('/register', { replace: true })} 
                 className="w-full btn-primary !py-6 !text-[13px] justify-center group"
               >
                 Access the Engine <Sparkles className="ml-2 w-4 h-4 group-hover:rotate-12 transition-transform" />

@@ -17,6 +17,12 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
   const [searchParams] = useSearchParams();
   const oauthError = searchParams.get('error') === 'oauth_failed' || searchParams.get('error') === 'oauth_state_mismatch';
 
+  React.useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', isDark);
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -149,7 +155,7 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
 
           <footer className="mt-8 text-center border-t border-warm-border dark:border-stone-700 pt-6">
             <p className="text-sm text-stone-400">
-              New here? <Link to="/register" className="text-stone-600 dark:text-stone-300 hover:underline font-semibold ml-1">Create account</Link>
+              New here? <Link to="/register" replace className="text-stone-600 dark:text-stone-300 hover:underline font-semibold ml-1">Create account</Link>
             </p>
           </footer>
         </div>

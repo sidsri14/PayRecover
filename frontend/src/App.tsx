@@ -133,7 +133,7 @@ type LayoutProps = {
 const Layout: React.FC<React.PropsWithChildren<LayoutProps>> = ({ children, user, onLogout }) => {
   const navigate = useNavigate();
   return (
-  <div className="min-h-screen flex flex-col transition-colors bg-cream dark:bg-stone-900">
+  <div className="min-h-screen flex flex-col transition-colors bg-cream dark:bg-stone-900 selection:bg-emerald-500/30">
     <header className="sticky top-0 z-50 p-4 border-b border-warm-border dark:border-stone-800 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md transition-all">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <div className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate('/')}>
@@ -257,6 +257,10 @@ function App() {
 
   useEffect(() => {
     checkAuth();
+    // Initialize theme from localStorage
+    const savedTheme = localStorage.getItem('theme');
+    const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', isDark);
   }, []);
 
   const handleLogout = async () => {
