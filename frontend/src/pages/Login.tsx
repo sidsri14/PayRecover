@@ -15,7 +15,7 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchParams] = useSearchParams();
-  const oauthError = searchParams.get('error') === 'oauth_failed';
+  const oauthError = searchParams.get('error') === 'oauth_failed' || searchParams.get('error') === 'oauth_state_mismatch';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

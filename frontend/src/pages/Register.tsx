@@ -27,7 +27,7 @@ const Register: React.FC<Props> = ({ onRegisterSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchParams] = useSearchParams();
-  const oauthError = searchParams.get('error') === 'oauth_failed';
+  const oauthError = searchParams.get('error') === 'oauth_failed' || searchParams.get('error') === 'oauth_state_mismatch';
 
   const allRulesMet = PASSWORD_RULES.every(r => r.test(password));
 

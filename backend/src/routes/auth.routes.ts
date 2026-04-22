@@ -17,7 +17,7 @@ router.post('/login', csrfCheck, authLimiter, validateRequest(loginSchema), logi
 // verified on callback to prevent OAuth CSRF / account-hijacking.
 import crypto from 'crypto';
 const OAUTH_STATE_COOKIE = 'oauth-state';
-const isProd = process.env.NODE_ENV !== 'development';
+const isProd = process.env.NODE_ENV === 'production';
 
 router.get('/google', (req, res, next) => {
   const state = crypto.randomBytes(16).toString('hex');
