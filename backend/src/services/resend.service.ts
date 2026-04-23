@@ -12,6 +12,7 @@ export interface SendEmailParams {
   to: string;
   subject: string;
   html: string;
+  from?: string;
   attachments?: Array<{ filename: string; content: Buffer }>;
 }
 
@@ -26,7 +27,7 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   }
 
   const { error } = await resend.emails.send({
-    from: process.env.RESEND_FROM ?? 'StripeFlow <noreply@stripeflow.app>',
+    from: params.from ?? process.env.RESEND_FROM ?? 'StripeFlow <noreply@stripeflow.app>',
     to: params.to,
     subject: params.subject,
     html: params.html,

@@ -27,11 +27,8 @@ const Team = () => {
   const { data: teamData, isLoading } = useQuery({
     queryKey: ['team'],
     queryFn: async () => {
-      const { data: orgData } = await api.get('/team/my');
-      const orgs = orgData.data as any[];
-      if (orgs.length === 0) return { orgs: [], activeOrg: null, members: [] };
-      const { data: memberData } = await api.get(`/team/${orgs[0].id}/members`);
-      return { orgs, activeOrg: orgs[0], members: memberData.data.members as any[] };
+      const { data } = await api.get('/team/mine');
+      return data.data as { orgs: any[]; activeOrg: any; members: any[]; total: number };
     },
     staleTime: 60_000,
   });

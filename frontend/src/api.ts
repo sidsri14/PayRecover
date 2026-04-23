@@ -74,6 +74,10 @@ api.interceptors.request.use(async (config) => {
 // Public paths that should never trigger a /login redirect on 401
 const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/', '/terms', '/privacy', '/contact', '/demo'];
 
+// Call at app startup so the token is cached before the user submits any form,
+// eliminating the first-POST 403 that occurs when the lazy fetch races a submit.
+export const warmCsrfToken = () => getCsrfToken().catch(() => {});
+
 // Intercept responses for global error handling (e.g., 401s)
 api.interceptors.response.use(
   (response) => response,

@@ -5,7 +5,7 @@ import { ScrollToTop } from './components/common/ScrollToTop';
 
 import { LogOut, TrendingUp, Link2, Loader2, Settings as SettingsIcon, Menu, X, Users } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
-import { api } from './api';
+import { api, warmCsrfToken } from './api';
 
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const Login = lazy(() => import('./pages/Login'));
@@ -239,6 +239,9 @@ function PageTitle() {
 function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  // Prevents React StrictMode from double-invoking the startup effect in dev,
+  // which would produce two GET /auth/me → two 401s in the network tab.
+  const authStarted = React.useRef(false);
 
   const checkAuth = async () => {
     try {
@@ -256,7 +259,10 @@ function App() {
   };
 
   useEffect(() => {
+    if (authStarted.current) return;
+    authStarted.current = true;
     checkAuth();
+    warmCsrfToken(); // pre-cache CSRF token so the first form submit never hits a 403
     // Initialize theme from localStorage
     const savedTheme = localStorage.getItem('theme');
     const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);

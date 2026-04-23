@@ -25,6 +25,39 @@ export const getMyOrganizations = async (req: AuthRequest, res: Response, next: 
   } catch (err) { next(err); }
 };
 
+// Single endpoint that returns orgs + members of the primary org, eliminating the
+// two-request waterfall in Team.tsx (GET /my then GET /:id/members).
+export const getMyTeamSummary = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const memberships = await prisma.membership.findMany({
+      where: { userId: req.userId! },
+      include: { organization: true },
+    });
+
+    const orgs = memberships.map(m => ({
+      id: m.organization.id,
+      name: m.organization.name,
+      role: m.role,
+    }));
+
+    if (orgs.length === 0) {
+      return successResponse(res, { orgs: [], activeOrg: null, members: [], total: 0 });
+    }
+
+    const activeOrg = orgs[0];
+    const [members, total] = await Promise.all([
+      prisma.membership.findMany({
+        where: { organizationId: activeOrg.id },
+        include: { user: { select: { id: true, email: true, name: true } } },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.membership.count({ where: { organizationId: activeOrg.id } }),
+    ]);
+
+    successResponse(res, { orgs, activeOrg, members, total });
+  } catch (err) { next(err); }
+};
+
 export const createOrganization = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { name } = req.body;

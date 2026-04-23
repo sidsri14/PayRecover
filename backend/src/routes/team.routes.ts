@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getMyOrganizations,
+  getMyTeamSummary,
   createOrganization,
   getOrgMembers,
   inviteUser,
@@ -17,6 +18,7 @@ import { createOrganizationSchema, inviteUserSchema } from '../validators/team.v
 const router = Router();
 
 router.get('/my', requireAuth, planAwareLimiter, getMyOrganizations);
+router.get('/mine', requireAuth, planAwareLimiter, getMyTeamSummary);
 router.post('/', csrfCheck, requireAuth, planAwareLimiter, validateRequest(createOrganizationSchema), createOrganization);
 router.get('/:orgId/members', requireAuth, planAwareLimiter, getOrgMembers);
 router.post('/:orgId/invite', csrfCheck, requireAuth, planAwareLimiter, validateRequest(inviteUserSchema), inviteUser);

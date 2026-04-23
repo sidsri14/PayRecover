@@ -1,9 +1,4 @@
-import { Resend } from 'resend';
-
-const apiKey = process.env.RESEND_API_KEY === 'mock' ? 're_123' : process.env.RESEND_API_KEY;
-export const resend = apiKey ? new Resend(apiKey) : null;
-
-const IS_MOCK = !process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === 'mock';
+import { sendEmail } from '../services/resend.service.js';
 
 function esc(s: unknown): string {
   return String(s ?? '')
@@ -25,9 +20,6 @@ interface BrandingContext {
   companyName?: string;
 }
 
-/**
- * Modern, branded HTML template wrapper
- */
 function getEmailTemplate(content: string, branding: BrandingContext) {
   // accentColor is validated to be a hex color (#rrggbb) before being stored,
   // so it is safe to interpolate directly. All other user-supplied fields use esc().
@@ -68,23 +60,14 @@ export async function sendInvoiceEmail(to: string, pdfUrl: string, paymentUrl: s
     <p style="text-align: center;"><a href="${esc(pdfUrl)}" style="color: #6b7280; text-decoration: underline; font-size: 14px;">Download PDF Receipt</a></p>
   `;
 
-  if (IS_MOCK) {
-    console.log(`[MOCK EMAIL] To: ${to}, Branding: ${JSON.stringify(branding)}`);
-    return { id: 'mock_email_id' };
-  }
-
-  if (!resend) throw new Error('Resend Not Initialized');
   const safeName = sanitizeHeaderValue(branding.companyName || 'StripeFlow');
   const fromAddress = process.env.RESEND_FROM ?? 'noreply@stripeflow.app';
-  const { data, error } = await resend.emails.send({
-    from: `${safeName} <${fromAddress}>`,
+  await sendEmail({
     to,
     subject: `Invoice: ${sanitizeHeaderValue(invoice.description)} - ${amount} ${invoice.currency || 'USD'}`,
-    html: getEmailTemplate(content, branding)
+    html: getEmailTemplate(content, branding),
+    from: `${safeName} <${fromAddress}>`,
   });
-
-  if (error) throw error;
-  return data;
 }
 
 export async function sendReminderEmail(to: string, invoice: any, branding: BrandingContext = {}) {
@@ -118,23 +101,14 @@ export async function sendReminderEmail(to: string, invoice: any, branding: Bran
     <a href="${esc(paymentLink)}" style="display: block; width: 100%; box-sizing: border-box; background: ${accent}; color: #ffffff; padding: 16px; text-align: center; border-radius: 12px; font-weight: 800; text-decoration: none;">View &amp; Pay Now</a>
   `;
 
-  if (IS_MOCK) {
-    console.log(`[MOCK EMAIL] To: ${to}, Tone: ${tone}, Branding: ${JSON.stringify(branding)}`);
-    return { id: 'mock_reminder_id' };
-  }
-
-  if (!resend) throw new Error('Resend Not Initialized');
   const safeName = sanitizeHeaderValue(branding.companyName || 'StripeFlow');
   const fromAddress = process.env.RESEND_FROM ?? 'noreply@stripeflow.app';
-  const { data, error } = await resend.emails.send({
-    from: `${safeName} <${fromAddress}>`,
+  await sendEmail({
     to,
     subject: `${tone === 'urgent' ? 'URGENT: ' : ''}Payment Reminder for ${sanitizeHeaderValue(invoice.description)}`,
-    html: getEmailTemplate(content, branding)
+    html: getEmailTemplate(content, branding),
+    from: `${safeName} <${fromAddress}>`,
   });
-
-  if (error) throw error;
-  return data;
 }
 
 export async function sendReceiptEmail(to: string, invoice: any, branding: BrandingContext = {}) {
@@ -151,21 +125,12 @@ export async function sendReceiptEmail(to: string, invoice: any, branding: Brand
     <p style="color: #6b7280; font-size: 14px;">Invoice ID: #${esc(invoice.id.slice(-8).toUpperCase())}</p>
   `;
 
-  if (IS_MOCK) {
-    console.log(`[MOCK RECEIPT] To: ${to}`);
-    return { id: 'mock_receipt_id' };
-  }
-
-  if (!resend) throw new Error('Resend Not Initialized');
   const safeName = sanitizeHeaderValue(branding.companyName || 'StripeFlow');
   const fromAddress = process.env.RESEND_FROM ?? 'noreply@stripeflow.app';
-  const { data, error } = await resend.emails.send({
-    from: `${safeName} <${fromAddress}>`,
+  await sendEmail({
     to,
     subject: `Payment received - Thank you!`,
-    html: getEmailTemplate(content, branding)
+    html: getEmailTemplate(content, branding),
+    from: `${safeName} <${fromAddress}>`,
   });
-
-  if (error) throw error;
-  return data;
 }
