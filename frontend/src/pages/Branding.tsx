@@ -280,13 +280,24 @@ const Branding: FC = () => {
                       )}
                     </div>
                     <p className="text-sm font-black text-stone-800 dark:text-stone-100">{settings.companyName || 'Your Brand'}</p>
-                    <div className="h-2 w-3/4 bg-stone-100 dark:bg-stone-700 rounded-full" />
-                    <div className="h-2 w-1/2 bg-stone-100 dark:bg-stone-700 rounded-full" />
+                    <div className="h-2 w-3/4 bg-stone-200 dark:bg-stone-600 rounded-full" />
+                    <div className="h-2 w-1/2 bg-stone-200 dark:bg-stone-600 rounded-full" />
                     <div
                       className="w-full h-8 rounded-lg mt-2 flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-white shadow-lg mx-auto drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
                       style={{ backgroundColor: settings.accentColor }}
                     >
                       Pay Now
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-stone-100 dark:border-stone-700/50 flex items-center justify-between opacity-80">
+                    <div className="flex flex-col gap-1">
+                      <div className="h-1.5 w-12 bg-stone-200 dark:bg-stone-500 rounded-full" />
+                      <div className="h-1.5 w-8 bg-stone-100 dark:bg-stone-600 rounded-full" />
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="w-4 h-4 rounded bg-stone-100 dark:bg-stone-600" />
+                      <div className="w-4 h-4 rounded bg-stone-100 dark:bg-stone-600" />
                     </div>
                   </div>
                 </div>
