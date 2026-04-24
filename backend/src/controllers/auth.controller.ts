@@ -4,6 +4,7 @@ import { registerUser, loginUser, verifyUserEmail, requestPassReset, completePas
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import { prisma } from '../utils/prisma.js';
 import { generateToken } from '../utils/jwt.js';
+import { logAuditAction } from '../services/audit.service.js';
 
 const isProd = process.env.NODE_ENV === 'production';
 export const COOKIE_OPS = { 
@@ -48,10 +49,11 @@ export const googleAuthCallback = async (req: Request, res: Response, next: Next
     if (!user || !user.id) {
       return res.redirect((process.env.FRONTEND_URL || 'http://localhost:5173') + '/login?error=oauth_failed');
     }
-    
+
     const token = generateToken(user.id);
     res.cookie('token', token, COOKIE_OPS);
-    
+    void logAuditAction(user.id, 'LOGIN_SUCCESS', 'User', user.id, { method: 'google' });
+
     // Redirect to dashboard on successful login
     res.redirect((process.env.FRONTEND_URL || 'http://localhost:5173') + '/dashboard');
   } catch (err) {
