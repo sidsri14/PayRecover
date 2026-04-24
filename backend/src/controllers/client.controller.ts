@@ -3,6 +3,7 @@ import type { AuthRequest } from '../middleware/auth.middleware.js';
 import { z } from 'zod';
 import { prisma } from '../utils/prisma.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
+import { logAuditAction } from '../services/audit.service.js';
 
 const clientCreateSchema = z.object({
   name: z.string().min(1).max(200),
@@ -21,6 +22,7 @@ export class ClientController {
       const client = await prisma.client.create({
         data: { userId: req.userId!, name, email, phone, company }
       });
+      void logAuditAction(req.userId!, 'CLIENT_CREATE', 'Client', client.id, { name, email });
       successResponse(res, client);
     } catch (err) {
       next(err);
@@ -56,6 +58,7 @@ export class ClientController {
       if (result.count === 0) return errorResponse(res, 'Client not found', 404);
 
       const client = await prisma.client.findUnique({ where: { id } });
+      void logAuditAction(req.userId!, 'CLIENT_UPDATE', 'Client', id, parsed.data);
       successResponse(res, client);
     } catch (err) {
       next(err);
@@ -68,6 +71,7 @@ export class ClientController {
       const userId = String(req.userId);
       const count = await prisma.client.deleteMany({ where: { id, userId } });
       if (count.count === 0) return errorResponse(res, 'Client not found', 404);
+      void logAuditAction(userId, 'CLIENT_DELETE', 'Client', id);
       successResponse(res, { success: true });
     } catch (err) {
       next(err);
