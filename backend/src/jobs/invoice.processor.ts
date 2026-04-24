@@ -50,7 +50,15 @@ export const invoiceWorker = new Worker(
       throw err;
     }
   },
-  { connection: redisConnection, concurrency: 5 }
+  {
+    connection: redisConnection,
+    concurrency: 5,
+    // Reduce Redis polling to stay within Upstash free-tier request limits.
+    // stalledInterval: how often to check for stalled jobs (default 30s → 5min)
+    // lockDuration: job lock TTL (default 30s → 5min), lockRenewTime = lockDuration/2
+    stalledInterval: 300_000,
+    lockDuration: 300_000,
+  }
 );
 
 invoiceWorker.on('failed', (job, err) => {

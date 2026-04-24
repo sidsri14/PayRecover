@@ -85,9 +85,14 @@ export class InvoiceService {
       emailTone: user.brandEmailTone || 'professional'
     });
 
-    // 7. Schedule BullMQ reminders
-    await enqueueInvoiceReminder(invoice.id, 'reminder1', 3 * 24 * 60 * 60 * 1000);
-    await enqueueInvoiceReminder(invoice.id, 'reminder2', 7 * 24 * 60 * 60 * 1000);
+    // 7. Schedule BullMQ reminders — fire-and-forget; Redis unavailability must not
+    //    block invoice creation (the invoice is already SENT at this point).
+    try {
+      await enqueueInvoiceReminder(invoice.id, 'reminder1', 3 * 24 * 60 * 60 * 1000);
+      await enqueueInvoiceReminder(invoice.id, 'reminder2', 7 * 24 * 60 * 60 * 1000);
+    } catch (queueErr) {
+      console.warn('[InvoiceService] Failed to schedule reminders (Redis unavailable?):', queueErr instanceof Error ? queueErr.message : queueErr);
+    }
 
     const updatedInvoice = await prisma.invoice.findUnique({ where: { id: invoice.id } });
 

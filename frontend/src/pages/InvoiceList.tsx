@@ -1,7 +1,7 @@
 import { type FC, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, ExternalLink, Trash2, Clock } from 'lucide-react';
+import { Plus, FileText, ExternalLink, Trash2, Clock, Search } from 'lucide-react';
 import { api, API_URL } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatAmount } from '../utils/format';
@@ -14,11 +14,14 @@ const InvoiceList: FC = () => {
   const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; desc: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState('');
 
   const { data: invoices, isLoading } = useQuery({
-    queryKey: ['invoices'],
+    queryKey: ['invoices', search],
     queryFn: async () => {
-      const { data } = await api.get('/invoices');
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      const { data } = await api.get(`/invoices?${params.toString()}`);
       return data.data.invoices;
     }
   });
@@ -63,6 +66,17 @@ const InvoiceList: FC = () => {
           <Plus className="w-5 h-5" />
           Create Invoice
         </button>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search invoices by description or email..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 glass rounded-xl text-sm text-stone-700 dark:text-stone-200 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+        />
       </div>
 
       <div className="glass rounded-2xl overflow-hidden shadow-xl">

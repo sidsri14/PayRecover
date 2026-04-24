@@ -95,7 +95,7 @@ const webhookWorker = new Worker(
     // queue rather than silently succeeding and hiding the misconfiguration.
     throw new Error(`Unknown job name: ${job.name}`);
   },
-  { connection: workerConnection, concurrency: 5 }
+  { connection: workerConnection, concurrency: 5, stalledInterval: 300_000, lockDuration: 300_000 }
 );
 
 webhookWorker.on('failed', (job, err) => {

@@ -4,6 +4,7 @@ import type { AuthRequest } from '../middleware/auth.middleware.js';
 import { z } from 'zod';
 import { prisma } from '../utils/prisma.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
+import { logAuditAction } from '../services/audit.service.js';
 
 const MAX_KEYS_PER_USER = 10;
 const KEY_PREFIX = 'pr_';
@@ -55,6 +56,7 @@ export const createApiKey = async (req: AuthRequest, res: Response, next: NextFu
     });
 
     // rawKey returned ONLY at creation — merchant must store it immediately
+    void logAuditAction(req.userId!, 'API_KEY_CREATE', 'ApiKey', apiKey.id, { name: parsed.data.name });
     successResponse(res, { ...apiKey, key: rawKey }, 201);
   } catch (err) { next(err); }
 };
@@ -83,6 +85,7 @@ export const updateApiKey = async (req: AuthRequest, res: Response, next: NextFu
       select: { id: true, name: true, prefix: true, active: true, lastUsedAt: true, expiresAt: true },
     });
 
+    void logAuditAction(req.userId!, 'API_KEY_UPDATE', 'ApiKey', id, parsed.data);
     successResponse(res, updated);
   } catch (err) { next(err); }
 };
@@ -95,6 +98,7 @@ export const deleteApiKey = async (req: AuthRequest, res: Response, next: NextFu
     if (!existing) return errorResponse(res, 'API key not found', 404);
 
     await prisma.apiKey.delete({ where: { id } });
+    void logAuditAction(req.userId!, 'API_KEY_DELETE', 'ApiKey', id);
     successResponse(res, { deleted: true });
   } catch (err) { next(err); }
 };

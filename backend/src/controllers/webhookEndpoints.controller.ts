@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '../utils/prisma.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
 import { isPrivateUrl } from '../utils/isPrivateUrl.js';
+import { logAuditAction } from '../services/audit.service.js';
 
 const VALID_EVENTS = [
   'payment.failed',
@@ -67,6 +68,7 @@ export const createEndpoint = async (req: AuthRequest, res: Response, next: Next
       select: { id: true, url: true, events: true, active: true, secret: true, createdAt: true },
     });
 
+    void logAuditAction(req.userId!, 'WEBHOOK_ENDPOINT_CREATE', 'WebhookEndpoint', endpoint.id, { url, events });
     successResponse(res, endpoint, 201);
   } catch (err) { next(err); }
 };
@@ -97,6 +99,7 @@ export const updateEndpoint = async (req: AuthRequest, res: Response, next: Next
       select: { id: true, url: true, events: true, active: true, updatedAt: true },
     });
 
+    void logAuditAction(req.userId!, 'WEBHOOK_ENDPOINT_UPDATE', 'WebhookEndpoint', id, parsed.data);
     successResponse(res, updated);
   } catch (err) { next(err); }
 };
@@ -109,6 +112,7 @@ export const deleteEndpoint = async (req: AuthRequest, res: Response, next: Next
     if (!ep) return errorResponse(res, 'Endpoint not found', 404);
 
     await prisma.webhookEndpoint.delete({ where: { id } });
+    void logAuditAction(req.userId!, 'WEBHOOK_ENDPOINT_DELETE', 'WebhookEndpoint', id);
     successResponse(res, { deleted: true });
   } catch (err) { next(err); }
 };
