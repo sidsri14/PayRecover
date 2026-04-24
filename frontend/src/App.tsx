@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { createPortal } from 'react-dom';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import { ScrollToTop } from './components/common/ScrollToTop';
@@ -54,6 +55,12 @@ import { ThemeToggle } from './components/common/ThemeToggle';
 const MobileNav = ({ user, onLogout }: { user: AuthUser; onLogout: () => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Close the drawer whenever the route changes (e.g., browser back button)
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
 
   const menuItems = [
     { label: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
@@ -72,9 +79,15 @@ const MobileNav = ({ user, onLogout }: { user: AuthUser; onLogout: () => void })
         <Menu className="w-5 h-5" />
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-[60] bg-stone-900/60 backdrop-blur-sm md:hidden animate-in fade-in duration-200">
-          <div className="fixed inset-y-0 right-0 w-72 bg-white dark:bg-stone-900 shadow-2xl border-l border-warm-border dark:border-stone-800 p-6 flex flex-col animate-in slide-in-from-right duration-300">
+      {isOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-stone-900/60 backdrop-blur-sm md:hidden animate-in fade-in duration-200"
+          onClick={() => setIsOpen(false)}
+        >
+          <div
+            className="fixed inset-y-0 right-0 w-72 bg-white dark:bg-stone-900 shadow-2xl border-l border-warm-border dark:border-stone-800 p-6 flex flex-col animate-in slide-in-from-right duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center mb-8">
               <div className="flex flex-col text-left">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest leading-none mb-1">Account</span>
@@ -119,7 +132,8 @@ const MobileNav = ({ user, onLogout }: { user: AuthUser; onLogout: () => void })
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
