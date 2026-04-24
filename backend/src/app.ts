@@ -168,22 +168,29 @@ app.get('/health', async (_req, res) => {
 // Singleton queue for stats — avoids opening a new connection on every request
 const statsQueue = new Queue('payment-recovery', { connection: redisConnection });
 
+// In-memory cache for queue stats — reduces Redis calls from every poll to once per 30s
+const QUEUE_STATS_CACHE_TTL_MS = 30_000;
+let queueStatsCache: { data: object; expiresAt: number } | null = null;
+
 // Queue Stats (authenticated — for dashboard use)
 app.get('/api/queue/stats', requireAuth, async (_req, res) => {
+  // Serve from cache if still fresh — avoids 2+ Redis round-trips per dashboard user per poll
+  if (queueStatsCache && Date.now() < queueStatsCache.expiresAt) {
+    return res.json({ success: true, data: queueStatsCache.data, cached: true });
+  }
   try {
     const counts = await statsQueue.getJobCounts('waiting', 'active', 'failed', 'delayed', 'completed');
     const hb = await redisConnection.get(HEARTBEAT_KEY);
     const workerAge = hb ? Date.now() - parseInt(hb, 10) : null;
-    res.json({
-      success: true,
-      data: {
-        queue: counts,
-        worker: {
-          status: !hb ? 'offline' : workerAge! < WORKER_STALE_MS ? 'online' : 'stale',
-          lastSeenMs: workerAge,
-        },
+    const data = {
+      queue: counts,
+      worker: {
+        status: !hb ? 'offline' : workerAge! < WORKER_STALE_MS ? 'online' : 'stale',
+        lastSeenMs: workerAge,
       },
-    });
+    };
+    queueStatsCache = { data, expiresAt: Date.now() + QUEUE_STATS_CACHE_TTL_MS };
+    res.json({ success: true, data });
   } catch (err: any) {
     res.status(500).json({ success: false, error: 'Failed to read queue stats' });
   }

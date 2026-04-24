@@ -180,13 +180,15 @@ const Team = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowInvite(true)}
-            className="flex items-center gap-2 px-6 py-3.5 bg-stone-900 dark:bg-white text-white dark:text-stone-900 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-stone-800 dark:hover:bg-stone-100 transition-all shadow-xl"
-          >
-            <UserPlus className="w-4 h-4" />
-            Invite Member
-          </button>
+          {isAdminOrOwner && (
+            <button
+              onClick={() => setShowInvite(true)}
+              className="flex items-center gap-2 px-6 py-3.5 bg-stone-900 dark:bg-white text-white dark:text-stone-900 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-stone-800 dark:hover:bg-stone-100 transition-all shadow-xl"
+            >
+              <UserPlus className="w-4 h-4" />
+              Invite Member
+            </button>
+          )}
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">

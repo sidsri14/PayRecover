@@ -16,10 +16,16 @@ const ForgotPassword = () => {
     try {
       await api.post('/auth/forgot-password', { email });
       setSent(true);
-      toast.success('Reset link sent to your email');
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(error.response?.data?.error || error.response?.data?.message || 'Failed to send reset link');
+      const error = err as { response?: { status?: number; data?: { error?: string; message?: string } } };
+      const status = error.response?.status;
+      if (status === 429) {
+        toast.error('Too many attempts. Please wait a few minutes and try again.');
+      } else if (status === 400) {
+        toast.error(error.response?.data?.error || 'Invalid email address.');
+      } else {
+        toast.error(error.response?.data?.error || error.response?.data?.message || 'Failed to send reset link. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -43,7 +49,7 @@ const ForgotPassword = () => {
         {sent ? (
           <div className="text-center space-y-6">
             <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-2xl text-emerald-700 dark:text-emerald-400 text-sm font-medium">
-              We've sent a password reset link to <span className="font-bold">{email}</span>. Please check your inbox.
+              If <span className="font-bold">{email}</span> is registered, you'll receive a reset link shortly. Check your inbox (and spam folder).
             </div>
             <button
               onClick={() => navigate('/login')}

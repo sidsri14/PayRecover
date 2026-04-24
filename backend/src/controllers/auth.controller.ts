@@ -173,6 +173,11 @@ export const updateBranding = async (req: AuthRequest, res: Response, next: Next
       select: { id: true, email: true, name: true, plan: true, createdAt: true, brandSettings: true, brandEmailSubject: true, brandEmailTone: true, password: true, googleId: true }
     });
     const { password, googleId, ...rest } = user;
+    void logAuditAction(req.userId!, 'BRANDING_UPDATE', 'User', req.userId!, {
+      ...(brandSettings !== undefined && { brandSettings }),
+      ...(brandEmailSubject !== undefined && { brandEmailSubject }),
+      ...(brandEmailTone !== undefined && { brandEmailTone }),
+    });
     successResponse(res, { user: { ...rest, hasPassword: password !== null, googleLinked: googleId !== null } });
   } catch (err) { next(err); }
 };

@@ -64,8 +64,8 @@ export function useDashboardData(currentUser: AuthUser | null) {
       setLastFetchedAt(new Date());
       return data.data;
     },
-    refetchInterval: 30000,
-    staleTime: 5000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // ── Clients
@@ -95,8 +95,8 @@ export function useDashboardData(currentUser: AuthUser | null) {
       });
       return data.data;
     },
-    refetchInterval: 30000,
-    staleTime: 5000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // ── Mutations

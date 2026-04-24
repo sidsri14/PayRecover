@@ -261,6 +261,7 @@ export const updateOrganization = async (req: AuthRequest, res: Response, next: 
       where: { id: orgId },
       data: { name: name.trim() },
     });
+    void logAuditAction(req.userId!, 'ORG_RENAME', 'Organization', orgId, { name: name.trim() });
     successResponse(res, org);
   } catch (err) { next(err); }
 };
