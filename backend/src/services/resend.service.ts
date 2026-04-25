@@ -1,10 +1,15 @@
 import { Resend } from 'resend';
 
 let client: Resend | null = null;
+let clientKey: string | null = null;
 
 function getClient(): Resend | null {
-  if (!process.env.RESEND_API_KEY) return null;
-  if (!client) client = new Resend(process.env.RESEND_API_KEY);
+  const key = process.env.RESEND_API_KEY ?? null;
+  if (!key) return null;
+  if (!client || clientKey !== key) {
+    client = new Resend(key);
+    clientKey = key;
+  }
   return client;
 }
 
