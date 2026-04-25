@@ -231,7 +231,7 @@ function PageTitle() {
   const location = useLocation();
   useEffect(() => {
     const titles: Record<string, string> = {
-      '/': 'StripeFlow | Premium Invoicing for Freelancers',
+      '/': 'StripeFlow | Create invoices. Get paid faster.',
       '/dashboard': 'Dashboard | StripeFlow',
       '/login': 'Sign In | StripeFlow',
       '/register': 'Create Account | StripeFlow',
@@ -245,7 +245,7 @@ function PageTitle() {
       '/reset-password': 'New Password | StripeFlow',
       '/verify-email': 'Verify Account | StripeFlow',
     };
-    document.title = titles[location.pathname] || 'StripeFlow | Invoicing for Freelancers';
+    document.title = titles[location.pathname] || 'StripeFlow | Create invoices. Get paid faster.';
   }, [location.pathname]);
   return null;
 }
