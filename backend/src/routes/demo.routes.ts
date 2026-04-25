@@ -15,5 +15,6 @@ const router = Router();
 
 router.get('/invoice/:id', demoLimiter, DemoController.getInvoice);
 router.post('/pay/:id', demoLimiter, DemoController.payInvoice);
+router.post('/create', demoLimiter, DemoController.createDemoInvoice);
 
 export default router;

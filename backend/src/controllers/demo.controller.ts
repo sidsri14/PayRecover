@@ -1,6 +1,11 @@
 import type { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { successResponse, errorResponse } from '../utils/apiResponse.js';
+import { StripeBillingService } from '../services/StripeBillingService.js';
+import { generateInvoicePDF } from '../services/pdf.service.js';
+import { sendInvoiceEmail } from '../lib/resend.js';
+import { enqueueInvoiceReminder } from '../jobs/invoice.queue.js';
+import { v4 as uuidv4 } from 'uuid';
 
 export class DemoController {
   static async getInvoice(req: Request, res: Response, next: NextFunction) {
@@ -48,6 +53,99 @@ export class DemoController {
       if (!invoice.stripeCheckoutUrl) return errorResponse(res, 'Payment link unavailable', 503);
 
       return successResponse(res, { url: invoice.stripeCheckoutUrl });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async createDemoInvoice(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { amount, clientEmail, description, dueDate } = req.body;
+
+      if (!amount || !clientEmail || !description || !dueDate) {
+        return errorResponse(res, 'All fields are required', 400);
+      }
+
+      // 1. Get or create a Demo User
+      let user = await prisma.user.findFirst({ where: { email: 'demo@stripeflow.app' } });
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email: 'demo@stripeflow.app',
+            name: 'StripeFlow Demo',
+            plan: 'free',
+          }
+        });
+      }
+
+      // 2. Get or create a Demo Client for this email
+      let client = await prisma.client.findFirst({ 
+        where: { userId: user.id, email: clientEmail } 
+      });
+      if (!client) {
+        client = await prisma.client.create({
+          data: {
+            userId: user.id,
+            email: clientEmail,
+            name: clientEmail.split('@')[0],
+            company: 'Demo Corporation',
+          }
+        });
+      }
+
+      // 3. Create the Invoice record
+      const amountCents = Math.round(parseFloat(amount) * 100);
+      const invoice = await prisma.invoice.create({
+        data: {
+          userId: user.id,
+          clientId: client.id,
+          number: `DEMO-${Date.now().toString().slice(-6)}`,
+          description,
+          amount: amountCents,
+          currency: 'USD',
+          clientEmail,
+          dueDate: new Date(dueDate),
+          status: 'SENT',
+        },
+        include: {
+          client: true,
+          user: true,
+          items: true,
+        }
+      });
+
+      // 4. Generate Stripe Session
+      const { checkoutUrl } = await StripeBillingService.createInvoiceSession(invoice, user);
+      
+      // Update invoice with the link
+      await prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { stripeCheckoutUrl: checkoutUrl }
+      });
+
+      // 5. Generate PDF
+      // We need to provide empty items array as it's required by PDF service type
+      const invoiceWithItems = { ...invoice, items: [], stripeCheckoutUrl: checkoutUrl };
+      const pdfBuffer = await generateInvoicePDF(invoiceWithItems as any);
+      
+      // 6. Send Email via Resend
+      const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+      const pdfUrl = `${frontendBase}/demo?invoice=${invoice.id}&preview=pdf`; // Mock PDF URL for demo
+      
+      await sendInvoiceEmail(clientEmail, pdfUrl, checkoutUrl!, invoice, {
+        companyName: 'StripeFlow Demo',
+        accentColor: '#10b981',
+      });
+
+      // 7. Queue 3-day reminder
+      const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+      await enqueueInvoiceReminder(invoice.id, 'reminder1', THREE_DAYS_MS);
+
+      return successResponse(res, { 
+        id: invoice.id, 
+        checkoutUrl,
+        message: `Invoice created! Email sent to ${clientEmail}.`
+      });
     } catch (err) {
       next(err);
     }

@@ -73,12 +73,12 @@ const LandingPage: FC = () => {
             </motion.div>
             
             <motion.div style={{ y: y1 }}>
-              <motion.h1
+            <motion.h1
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-6xl md:text-9xl font-black gradient-heading tracking-tighter leading-[0.85] mb-8"
               >
-                PAYMENT <br /> <span className="text-emerald-500 dark:text-emerald-400">EVOLUTION.</span>
+                CREATE INVOICES <br /> <span className="text-emerald-500 dark:text-emerald-400">IN 10 SECONDS.</span>
               </motion.h1>
 
               <motion.p
@@ -87,7 +87,7 @@ const LandingPage: FC = () => {
                 transition={{ delay: 0.3 }}
                 className="max-w-2xl mx-auto text-slate-500 dark:text-slate-400 text-lg md:text-xl font-medium leading-relaxed"
               >
-                The elite invoicing engine for modern professionals. Branded PDFs, high-converting Stripe links, and legendary automated recovery flow.
+                Get paid faster with auto Stripe links + reminders. Global. Simple.
               </motion.p>
             </motion.div>
 
@@ -101,13 +101,13 @@ const LandingPage: FC = () => {
                 onClick={() => navigate('/register')} 
                 className="btn-primary !px-12 !py-6 !text-[13px] shadow-2xl shadow-emerald-500/20 group hover:scale-105 active:scale-95"
               >
-                Initialize Your Engine <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
+                Start for Free <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
               </button>
               <button 
-                onClick={() => navigate('/demo?invoice=demo')} 
+                onClick={() => navigate('/demo')} 
                 className="btn-secondary !px-12 !py-6 !text-[13px] hover:bg-slate-50 dark:hover:bg-slate-800 transition-all hover:scale-105 active:scale-95"
               >
-                Live Preview
+                Create Test Invoice
               </button>
             </motion.div>
           </div>
@@ -156,19 +156,20 @@ const LandingPage: FC = () => {
               className="glass-card hover:scale-100 !p-16 space-y-10 glow-emerald max-w-2xl mx-auto"
             >
               <div className="inline-block px-4 py-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">
-                Most Popular
+                Start for Free
               </div>
               <div className="space-y-2">
                 <h3 className="text-4xl font-black">Professional</h3>
                 <div className="flex items-center justify-center gap-3">
-                   <span className="text-7xl font-black tracking-tighter">₹1499</span>
+                   <span className="text-7xl font-black tracking-tighter">$19</span>
                    <span className="text-slate-400 font-bold text-sm">/ mo</span>
                 </div>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">$190 / year (2 months free)</p>
               </div>
               <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                 {[
-                  'Unlimited Premium Invoices',
-                  'Automated Recovery Sequences',
+                  'Unlimited Global Invoices',
+                  'Automated Payment Reminders',
                   'Custom Brand Experience',
                   'Client Analytics Dashboard',
                   'Priority Support'
@@ -182,7 +183,7 @@ const LandingPage: FC = () => {
                 onClick={() => navigate('/register')} 
                 className="w-full btn-primary !py-6 !text-[13px] justify-center group"
               >
-                Access the Engine <Sparkles className="ml-2 w-4 h-4 group-hover:rotate-12 transition-transform" />
+                Get Started Now <Sparkles className="ml-2 w-4 h-4 group-hover:rotate-12 transition-transform" />
               </button>
             </motion.div>
           </div>
