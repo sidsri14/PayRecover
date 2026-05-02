@@ -8,6 +8,7 @@ docs/
 .vscode/
 .idea/
 .claude/
+.agent/
 
 # OS Files
 .DS_Store
